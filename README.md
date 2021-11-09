@@ -14,6 +14,6 @@ for 20 years or so.
 
 This repository includes no graphics code, as site-by-site variation in 
 conditions strongly dominate the observed patterns, and those differences are
-most easily shown via maps. The "Analysis" folder included code that explored
+most easily shown via maps. The "Analysis" folder includes code that explored
 ways to analyze these data to evaluate long-term trends (none were found), and
 export data that gould be used in GIS to produce informative maps.
