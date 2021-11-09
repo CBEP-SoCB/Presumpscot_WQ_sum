@@ -1,0 +1,355 @@
+---
+title: "Data Organization for Presumpscot WQ Monitoring Data On UNCORRECTED Data"
+output: html_notebook
+---
+
+# Inroduction
+This Notebook documents how raw data was converted to the working data.
+Preliminary analysis reveals that 2018 and 2019 data were delivered incomplete,
+without all supplementary data.  While for the most part, that simply reduces
+analytic options, it also drops the flags indicating QA/QC duplicates.
+
+This version of this file is obsolete, and is retained only to document the 
+effect of later data corrections.
+
+# Import Libraries
+```{r}
+library(readxl)
+library(tidyverse)
+```
+
+# Import Data
+```{r}
+sibfldnm <- 'Original_Data'
+parent <- dirname(dirname(getwd()))               # Actually a granparent....
+sibling <- file.path(parent, sibfldnm)
+fn <- 'Historical_Data_Master.xlsx'
+
+Prelim_presumpscot_data <- read_excel(file.path(sibling, fn), col_types = 'text')
+
+```
+
+## Non Missing Observations
+These are the variables for which we have complete or nearly complete data.
+```{r}
+tmp <- Prelim_presumpscot_data %>%
+  summarise(across(everything(), ~sum(! is.na(.)))) %>%
+  unlist(.)
+tmp[tmp<100]
+```
+
+## Missing Observations
+These are variables for which we have high numbers of missing values.
+```{r}
+tmp <- Prelim_presumpscot_data %>%
+  summarise(across(everything(), ~sum(is.na(.)))) %>%
+  unlist(.) 
+tmp[tmp>100]
+```
+
+```{r}
+names(Prelim_presumpscot_data)
+```
+
+## Reload Data
+We reload the data and drop variables that we either won't or can't analyze.
+```{r}
+suppressWarnings(Prelim_presumpscot_data2 <- read_excel(file.path(sibling, fn),
+                                      col_types = c("skip", "skip",
+                                                    "text", "text",
+                                                    "skip", "numeric",  #Year
+                                                    "date","date",
+                                                    "text", "numeric",
+                                                    "skip", "text",
+                                                    "numeric", "numeric",
+                                                    "numeric", "numeric", #spcond
+                                                    "skip", "skip",
+                                                    "skip", "skip",
+                                                    "skip", "text",       #Ecoli
+                                                    "skip", "skip", 
+                                                    "skip", "skip",
+                                                    "skip", "skip",
+                                                    "skip", "skip",   
+                                                    "skip", "text",   #Sampled by
+                                                    "text", "text",
+                                                    "numeric", "text",
+                                                    "text", "skip",
+                                                    "text", "text",
+                                                    "skip", "skip",
+                                                    "text", "text")))
+```
+
+```{r}
+names(Prelim_presumpscot_data2)
+```
+
+# Clean the Data
+We rename variables amd convert many to factors (without checking levels).
+```{r}
+names(Prelim_presumpscot_data2) <- c("Site", "Name", "Year", "Date",  "Time", 
+                                    "QC", "Depth", "Flow", 
+                                    "Temp", "DO", "PctSat",
+                                    "SpCond", "Ecoli", "Sampled_By",   
+                                    "Weather", "Recent_Weather",  "AirTemp",        
+                                    "Condition", "Location", 
+                                    "Stage", "Habitat", "Appearance",
+                                    "Comments")
+
+Prelim_presumpscot_data2 <- Prelim_presumpscot_data2 %>%
+  mutate_at(c('Site', 'QC', 'Flow', 'Sampled_By', 'Weather', 'Recent_Weather',
+             'Condition', 'Location', 'Stage', 'Habitat', 'Appearance'), ~ factor(.))
+
+summary(Prelim_presumpscot_data2)
+```
+
+Note that many of the descriptive data fields are incomplete, with many NAs.
+While not evident from the summaries, most were not reported for the 2018 and
+2019 data.  (Presumably that is because these data were hand entered into the
+spreadsheet by PRLT, not accessed from the complete records in DEP's EGAD data
+management system.)  Because those data are incomplete, we functionally can not
+analyze them, so we remove them from further consideration.
+
+# Prepare Data for Analysis 
+Here we remove qualitative data we can not analyze, and create data flags
+for censored E. coli data.
+```{r}
+presumpscot_data <- Prelim_presumpscot_data2 %>%
+  select(-Flow, -SpCond, -Sampled_By, -Weather, -Recent_Weather, -AirTemp,
+         -Condition, -Location, - Stage, -Habitat, -Appearance, -Comments) %>%
+  mutate(QC = replace_na(QC, "NA")) %>%  # remove NAs so they are counted
+  mutate(qualifier = ifelse(substr(Ecoli,1,1) %in% c('<', '>'),
+                            substr(Ecoli,1,1), "" ))  %>%
+  mutate(Ecoli = ifelse(Ecoli=='>', '>2419.6', Ecoli)) %>%
+  mutate(value = ifelse(nchar(qualifier)>0,
+                       as.numeric(substr(Ecoli,2,nchar(Ecoli))),
+                       as.numeric(Ecoli))) %>%
+  arrange(Date, Site)
+```
+
+## Check the E. coli Data
+1. Did we generate any new NAs?
+2. Did left censored values get converted appropriately?
+3. Did right censored vlaues get converted appropriately?
+4. What do high uncensored values look like?
+```{r}
+presumpscot_data %>% select(Ecoli, qualifier, value) %>% filter( is.na(value) & ! is.na(Ecoli))
+presumpscot_data %>% select(Ecoli, qualifier, value) %>% filter( qualifier == '<')
+presumpscot_data %>% select(Ecoli, qualifier, value) %>% filter( qualifier == '>')
+presumpscot_data %>% select(Ecoli, qualifier, value) %>% filter( qualifier == '' & value >2410)
+```
+
+So, we've addressed all the right censored observations and there is only a
+single left censored observation!  That's pretty remarkable.  And it means we can
+ignore it for any practical purpose. In effect, we can treat this as only right
+censored, not left censored data.
+
+Note that some right censored values appear to have been inconsistently coded as
+2419.2 instead of 2419.6.  I suspect those are errors in coding, but the error
+is so small that they won't matter in any analysis, so we leave them unchanged.
+
+Similarly, there are (uncensored) values recorded at 2419.17, 2419.2, and
+2419.6. Again, my guess is these all represent maximum observable values, coded
+differently.  But differences won't matter, so we leave them unaltered.
+
+## Data Completeness
+While we're at it, notice that some data fields are absent for recent years.  my
+guess is that's because the data file was partially downloaded from DEP, and
+partially entered directly by PRLT.
+```{r}
+presumpscot_data %>%
+  group_by(Year) %>%
+  summarize_at(c("Time", "QC", "Depth", "Temp", 
+                 "DO", "PctSat", "Ecoli"), 
+               function(x) sum(! is.na(x)))
+```
+
+
+## Exploring Field Duplicates
+Field duplicates should occur periodically in every year, as QA/QC checks.
+They would have multiple E. coli or dissolved oxygen data from the same date and 
+location.
+```{r}
+presumpscot_data %>%
+  group_by(Date, Site) %>%
+  summarize(nColi= sum(!is.na(Ecoli) ),
+            nDO = sum(!is.na(DO)),
+            Year = min(Year)) %>%
+  filter(nColi>1 | nDO>1) %>%
+  arrange(Year, Date)
+```
+That shows NO field duplicates in 2018, but quite a few in 2019. 
+
+## How Many Dupplicates are not flagged as duplicates?
+```{r}
+presumpscot_data %>%
+  mutate(QC = replace_na(QC, "NA")) %>%  # remove NAs so they are counted
+  filter(QC != "D") %>%
+  group_by(Date, Site) %>%
+  summarize(nColi= sum(!is.na(Ecoli) ),
+            Year = min(Year)) %>%
+  filter(nColi>1) %>%
+  arrange(Date, Site)
+```
+There appears to be one duplicate sample in 2012 that was not coded as a
+duplicate, and then they are inconsistently coded in 2017, and never coded in
+2019.
+
+The 2012 mis-coded sample is for Site = BL010, Date = 2012-08-25.  They
+certainly look like field duplicates.  All parameters are similar.  This can be
+corrected by recoding the one with `Temp ==  17.2` as a Duplicate.
+
+### Correct 2012 Data
+```{r}
+presumpscot_data2 <- presumpscot_data %>%
+  mutate(QC = if_else((Date == as.Date("2012-08-25") &
+                       Site == "BL010" &
+                       Temp == 17.2), "D", as.character(QC))) %>%
+  
+  mutate(QC = factor(QC, labels = c("D", "NA"))) %>%
+  arrange(Year, Site, Date)
+```
+
+### Look at 2017
+It's a little more complicated for 2017 and 2019.  For 2017:
+```{r}
+filter2017 <- presumpscot_data %>%
+  mutate(QC = replace_na(QC, "NA")) %>%  # remove NAs so they are counted
+  
+  # Calculate number of samples, and whether any are labled as duplicates
+  group_by(Date, Site) %>%
+  mutate(nColi= sum(!is.na(Ecoli)),
+         Year = min(Year),
+         D = any(QC=="D")) %>%
+  ungroup() %>%
+  
+  # Extract 2017
+  filter(Year==2017) %>%
+  
+  #Extract observations that are part of a possible duplicate
+  filter(nColi>1) %>%
+
+  #Extract those that where none are labeled as duplicates
+  filter(!D) %>%
+  
+  arrange(Site,Date) %>%
+  select(Site, Year, Date, Temp, DO, PctSat) %>%
+  slice(1:7*2)  # Select every other row of the 14 selected
+filter2017
+```
+
+### Look at 2019
+```{r}
+filter2019 <- presumpscot_data %>%
+  mutate(QC = replace_na(QC, "NA")) %>%  # remove NAs so they are counted
+  group_by(Date, Site) %>%
+  mutate(nColi= sum(!is.na(Ecoli)),
+         Year = min(Year),
+         D = any(QC=="D")) %>%
+  ungroup() %>%
+  filter(nColi>1) %>%
+  filter(Year==2019) %>%
+  filter(!D) %>%
+  arrange(Site,Date) %>%
+  select(Site, Year, Date, Temp, DO, PctSat) # %>%
+  #slice(1:7*2)  # Select every other row of the 14 selected
+filter2019
+```
+
+So any of the other metrics could work to tell things apart in 2017, but not in 
+2019, when temperature data were not recorded.
+
+### Examine 2017 Data More Closely 
+```{r}
+presumpscot_data3 <- presumpscot_data2 %>%
+  mutate (QC = if_else (Site %in% filter2017$Site &
+                         Date %in% filter2017$Date &
+                           (is.na(Temp)| Temp %in% filter2017$Temp),
+                       "D", as.character(QC))) 
+```
+
+In the following, we are looking for pairs of records where the QC flag is
+the SAME for two records (i.e. both "D" or both "NA").  Those are records where 
+coding has not correctly selected one record at the "duplicate" and the otehr as 
+the "original" record.
+```{r}
+presumpscot_data3 %>%
+    group_by(Date, Site) %>%
+  mutate(nColi= sum(!is.na(Ecoli))) %>%
+  ungroup() %>%
+  filter(Year==2017) %>%
+  filter(nColi>1) %>%
+  arrange(Site,Date) %>%
+  select(Site, Year, Date, QC, Temp, DO, PctSat)
+```
+We're still having problems with:  
+*  DG010	2017-06-03
+*  P135	2017-05-20
+*  P135	2017-06-03
+
+Another ways too document inconsistent field duplicate labels in 2017:
+
+```{r}
+presumpscot_data %>%
+  mutate(QC = replace_na(QC, "NA")) %>%  # remove NAs so they are counted
+  group_by(Date, Site) %>%
+  summarize(nColi= sum(!is.na(Ecoli)),
+            Year = min(Year),
+            D = any(QC=="D")) %>%
+  filter(nColi>1) %>%
+  filter(Year == 2017) %>%
+  filter(!D) %>%
+  arrange(Site)
+```
+
+
+# Data Prevalence
+## Cross classify Ecoli Data
+```{r}
+presumpscot_data %>%
+  group_by(Site, Year)%>%
+  summarize(n=sum(! is.na(Ecoli)))%>%
+  spread(Year, n)
+```
+
+## Cross classify DO Data
+```{r}
+presumpscot_data %>%
+  group_by(Site, Year)%>%
+  summarize(n=sum(! is.na(DO)))%>%
+  spread(Year, n)
+```
+Apparently, a total of 47 locations have been sampled by PRW since 2009. The
+normal sampling plan in each year is to sample a fixed number of Saturdays,
+usually eight.  We often see more than eight sample records at a site within a
+year.  Generally this is because QA/QC replicate samples were collected, or
+samples were collected at  different depth on one sample date.  Multiple depth
+samples were only collected in 2011, 2012, 1nd 2013.
+
+Prior analysis has shown little effect of sample depth, but there sometimes are
+substantial differences in observed E. coli values for replicate samples,
+expressed as a percent difference.  On a log scale, however, the differences are
+less apparent.
+
+(Note that we previously dropped the QC Type codes and Sample Depth values from
+the data because both were not reported for 2018 an 2019. We could use those
+codes, as we have before, to analyze differences between replicates and depths,
+but neither is the focus of this analysis. We will analyze all observations here,
+treating QA/QC replicates and depths as replicates, or summarizing all
+observations collected during a sampling events using means, medians, or
+geometric means, as appropriate.)
+
+## Final cleanup
+```{r}
+presumpscot_data <- presumpscot_data %>%
+  mutate(Flag= (qualifier == '>')) %>%
+  select(-Ecoli, -qualifier) %>%
+  rename(Ecoli = value)
+```
+
+# Save data file as CSV
+```{r}
+tmp <- presumpscot_data %>%
+  mutate(Time=strftime(Time, format = "$H:%M:$S"))
+write.csv(presumpscot_data, 'presumpscot_UNCORRECTED.csv')
+```
+

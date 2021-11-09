@@ -1,0 +1,576 @@
+---
+title: "Analysis of Dissolved Oxygen Data from Presumpscot Monitoring"
+author:  "Curtis C. Bohlen, Casco Bay Estuary Partnership"
+date: "12/30/2020"
+output:
+  github_document:
+    toc: true
+    fig_width: 5
+    fig_height: 4
+---
+
+<img
+  src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
+  style="position:absolute;top:10px;right:50px;" />
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.align = 'center',
+                      fig.width = 5, fig.height = 4,
+                      collapse = TRUE, comment = "#>")
+```
+
+# Introduction
+This notebook provides a  look at data derived from eleven years of a volunteer
+water quality monitoring managed by Presumpscot River Watch (PRW), and more
+recently, by the Presumpscot Land Trust (PRLT). The data were delivered to CBEP
+by staff at PRLT in March of 2020, incorporating data through 2019.  PRW began
+submitting data to DEP in 2009, so the data reviewed here only goes back that
+far.
+
+The goal of this analysis was to develop analyses to underpin graphics for the
+2020 State of the Bay Report.  However, because results at each monitoring site
+differs, results the analyses provide general background. Each site really needs
+to be evaluated on its own terms.
+
+Given the large number of sites, there is no convenient way to summarize
+results, and so simple frequencies and averages are exported to a CSV file for
+import into GIS for graphic display.
+
+# Maine's Numeric Water Quality Standards
+Maine's numerical water quality standards for the summer months, as laid out in
+statute (38 MRSA 465) are as follows:
+
+|Class|DO ppm "Instantaneous"|DO ppm 30 Day Avg|Percent Saturation|*E. coli* (# per 100 ml) Instantaneous|*E. coli* (# per 100 ml)Geom. Mean|
+------|-------|-------|-------|-------|-------|
+| A | 7 | | 75 % | | |
+| B | 7 | | 75 % | 236 | 64 |
+| C | 5 | 6.5 | 60 % | 236 | 126 |
+
+(Class "AA" streams are not shown in this table because there are no numerical
+standards unique to AA streams.)
+Bacteria standards apply over a 90 day period, with the instantaneous standard
+not to be exceeded more than 10% of the time over a 90 day period.
+
+# Import Libraries
+```{r}
+library(fitdistrplus)
+library(emmeans)
+library(tidyverse)
+library(lme4)
+
+library(CBEPgraphics)
+load_cbep_fonts()
+theme_set(theme_cbep())
+```
+
+# Import Data
+```{r}
+sibfldnm <- 'Derived_Data'
+parent <- dirname(getwd())
+sibling <- paste(parent,sibfldnm, sep = '/')
+fn <- 'presumpscot_CORRECTED.csv'
+
+presumpscot_data <- read_csv(file.path(sibling, fn),
+    col_types = cols(Ecoli = col_double(),
+                     X1 = col_skip()))
+
+presumpscot_data <- presumpscot_data %>%
+  select (-Time, -Ecoli, -Flag) %>%
+  filter(! (is.na(DO) & is.na(PctSat))) %>%
+  mutate(Month = factor(as.numeric(format(Date, '%m')),
+                        labels = month.abb[5:9]))  %>%  # Note that as.numeric()
+                                                       # will not give month 1;12
+  mutate(YearF = factor(Year))
+```
+
+## Correct Probable Data Errors
+Several values are apparent outliers in the source data.  See the notebook
+`Data_QA.QC_AFTER_Corrections,Rmd` for details.  These are data that have
+unlikely or unreasonable values, but for which we could not confirm a data
+handling error, so we remove them here (explicitly for transparency), rather 
+than in data preparation code, where this decision might not be obvious.
+
+```{r}
+presumpscot_data <- presumpscot_data %>%
+mutate( PctSat =  replace(PctSat,
+                          Site == 'M030' & Date == as.Date('2014-07-12'), 
+                          NA),
+        PctSat = replace(PctSat,
+                         Site =='PI020' &  Date == as.Date('2014-07-12'),
+                         NA),
+        DO     = replace(DO,
+                         Site =='CW020' &  Date == as.Date('2018-07-29'),
+                         NA),
+        DO     = replace(DO,
+                         Site =='PL045' &  Date == as.Date('2019-06-01'),
+                         NA))
+```
+
+## Create a "Surface Water Only" Ddata Set
+Note that this is not necessary for *E. coli*, but is for DO. Dissolved oxygen
+data was collected for several years at multiple depths at certain sites.  While
+preliminary analyses suggested that depth had little effect on the DO levels,
+focusing on a "surface water only" data set simplifies the analysis slightly, by
+not requiring us to check.
+```{r}
+surface_data <- presumpscot_data %>%
+  filter(is.na(Depth) | Depth == 0)
+```
+
+```{r}
+cat('All Data\n')
+a <- with(presumpscot_data, cbind(length(DO),
+                             sum(! is.na(DO))))
+colnames(a) <- c('N', 'DO')
+a
+
+cat('Surface Data\n')
+a <- with(surface_data, cbind(length(DO),
+                         sum(! is.na(DO))))
+colnames(a) <- c('N', 'DO')
+a
+rm(a)
+```
+So we dropped 102 DO samples by restricting attention to surface water samples
+only. 
+
+```{r}
+presumpscot_data <- surface_data
+rm(surface_data)
+```
+
+# List Sites for Specific Analyses
+A total of 47 locations have been sampled by PRW and PRLT since 2009. The normal
+sampling plan in each year is to sample a fixed number of Saturdays, usually 
+eight.  We often see more than eight sample records at a site within a year.
+Generally this is because QA/QC replicates were collected. Multiple depth samples
+were only collected in 2011, 2012, and 2013.
+
+## Trend Analysis
+Here we create a vector of sites sampled at least five times.  Note that this 
+omits some recent sites, but provides the sites for which trend analysis may be 
+useful.
+```{r}
+trendsites <- presumpscot_data %>%
+  group_by(Site, Year) %>%
+  summarize(sampled = n()>0,
+            .groups = 'drop_last') %>%
+  summarise(yrssampled = sum(sampled)) %>%
+  filter(yrssampled>=5) %>%
+  pull(Site)
+trendsites
+```
+Twenty nine sites have been sampled at least five times, and thus could be used
+to estimate / study trends.
+
+## Recent Sites
+We look at data collected over the past five years, restricted to sites with
+at least two years of data.  No site with at least two years of data has 
+fewer than 15 samples. This cuts out some sites that have only recently been 
+added to the monitoring program.
+```{r}
+recentsites <- presumpscot_data %>%
+  filter(Year>2014) %>%
+  group_by(Site, Year) %>%
+  summarize(sampled = n()>0,
+            samples = n(),
+            .groups = 'drop_last') %>%
+  summarise(yrssampled = sum(sampled),
+            samples=sum(samples),
+            .groups = 'drop') %>%
+  filter(yrssampled > 2) %>%
+  arrange(samples)
+recentsites
+```
+```{r}
+recentsites <- recentsites %>% pull(Site)
+```
+
+# DO Graphics
+## Histograms
+```{r}
+m <- mean(presumpscot_data$DO, na.rm = TRUE)
+s <- sd(presumpscot_data$DO, na.rm = TRUE)
+plt <- ggplot(presumpscot_data, aes(DO)) +
+  geom_histogram(aes(y = ..density..), bins=50) +
+  geom_density(color = 'orange') +
+  geom_function(fun = dnorm, args = list(mean = m, sd = s), color = 'red')
+plt
+```
+So, clearly a negatively skewed, fat tailed distribution, with low values that
+turn up more frequently than expected under a normal distribution.
+
+```{r}
+m <- mean(presumpscot_data$PctSat, na.rm = TRUE)
+s <- sd(presumpscot_data$PctSat, na.rm = TRUE)
+plt <- ggplot(presumpscot_data, aes(PctSat)) +
+  geom_histogram(aes(y = ..density..), bins=50) +
+  geom_density(color = 'orange') +
+  geom_function(fun = dnorm, args = list(mean = m, sd = s), color = 'red')
+plt
+```
+Percent Saturation is even more heavily skewed.  Although this is not a true
+percentage, it is effectively ratio of random variables, and so might
+be expected to be distributed closer to Cauchy.
+
+## Percent Saturation vs. DO
+```{r}
+plt <- ggplot(presumpscot_data, aes(DO, PctSat)) + 
+  geom_point(aes(color =factor(Year))) + 
+  geom_smooth() +
+  geom_hline(yintercept=75, color='red') +
+  geom_hline(yintercept=60, color='orange') +
+  
+    geom_vline(xintercept=5, color='red') +
+  geom_vline(xintercept=6.5, color='orange') +
+  geom_vline(xintercept=7, color='yellow') +
+  theme_minimal()
+plt
+```
+
+The relationship between DO and percent saturation is about as one would expect,
+with a largely linear relationship for low concentrations of DO, but a
+curvilinear relationship as DO levels exceed about 80%.
+
+# Linear Models
+All analyses here are a bit cavalier, as we end up concluding that we will not
+use specific results of these analyses directly in SoCB.  We do not, for
+example, conduct all relevant model diagnostics, and do not search for
+alternative models that may provide better estimates of standard errors and 
+nominal p values.  That is important because we know both DO and Percent
+Saturation figures are likely to be somewhat to highly skewed, with significant 
+kurtosis. The justification is that we can not look at results across all
+monitoring sites, and probably should lookat each monitoring site individually,
+and we do not have the space in SoCB to do so effectively.  The only summaries
+we use therefore are site by site means and frequencies.
+
+## Dissolved Oxygen
+```{r}
+do_lm <- lm(DO ~ Site + Month + YearF + Site:YearF, data = presumpscot_data)
+do_lm_2 <- lm(DO ~ Site + Month + Year + Site:Year, data = presumpscot_data)
+fin_mod <- step(do_lm)
+fin_mod_2 <- step(do_lm_2)
+```
+
+```{r}
+anova(fin_mod)
+anova(fin_mod_2)
+```
+So, in both cases, the best model (by AIC) includes both year and year by site 
+interaction terms, and fitting a separate value for each year provides a 
+stronger fit than fitting a linear term.
+
+That means we have no real pattern to point to across sites.  We need to
+evaluate each site more or less independently.  There is little evidence for
+a meaningful trend across the region.
+
+To evaluate the temporal pattern, we can fit a model by year that treats each
+site as a random factor, and focuses on average conditions year by year across
+sites. We include the MOnth term in the model to reduce variance estimates.
+```{r}
+thlmer <- lmer(DO ~ YearF + Month + ( 1 | Site), data = presumpscot_data)
+anova(thlmer)
+```
+```{r}
+summary(thlmer)
+```
+
+
+```{r}
+plot(emmeans(thlmer, 'Month'))
+```
+
+Note that dissolved oxygen follows the pattern one might expect based on
+seasonal temperatures, with the highest DO occurring early in the year,
+and lowest occurring in summer.
+
+```{r}
+plot(emmeans(thlmer, 'YearF'))
+```
+
+As for the *E. coli* data, there is no robust long term trend here.  Although a
+"significant" trend can be detected statistically via a linear model, its slope 
+is low, and it is a spurious value that hides site to site and year to year
+variation.
+
+## Percent Saturation
+```{r}
+pctsat_lm <- lm(PctSat ~ Site + Month + YearF + Site:YearF, data = presumpscot_data)
+pctsat_lm_2 <- lm(PctSat ~ Site + Month + Year + Site:Year, data = presumpscot_data)
+fin_mod <- step(pctsat_lm)
+fin_mod_2 <- step(pctsat_lm_2)
+```
+
+```{r}
+anova(fin_mod)
+anova(fin_mod_2)
+```
+So, in both cases, the best model (by AIC) includes both year and year by site 
+interaction terms, and fitting a separate value for each year provides a 
+stronger fit than fitting a linear term (where the term does not achieve 
+significance).
+
+That means we have no real pattern to point to across sites.  We need to
+evaluate each site independently.  There is no evidence for
+a meaningful trend across the region.
+
+To evaluate the temporal pattern, we can fit a model by year that treats each
+site as a random factor, and focuses on average conditions year by year across
+sites. We include the Month term in the model to reduce variance estimates.
+```{r}
+thlmer <- lmer(PctSat ~ YearF + Month + ( 1 | Site), data = presumpscot_data)
+```
+```{r}
+summary(thlmer)
+```
+
+
+```{r}
+plot(emmeans(thlmer, 'Month'))
+```
+
+Percent Saturation also shows a seasonal (Monthly) signal, which is somewhat
+harder to explain than variation in dissolved oxygen alone, although the
+variation in mean percent saturation is relatively small -- ranging only from
+about 80% to about 90%.  If seasonal patterns were the focus of our analysis, we
+would need to fit additional models with site by month interaction terms, and
+probably treat Year as the random factor here, not sites.
+
+```{r}
+plot(emmeans(thlmer, 'YearF'))
+```
+
+## Models Including Temperature
+The fact that Percent Saturation models show reduced signal compared to DO 
+models suggests that year to year variation in temperature may be important.
+
+### Graph Annual Average Temperatures
+```{r}
+presumpscot_data %>%
+  group_by(Year) %>%
+  summarize(mean_temp = mean(Temp, na.rm = TRUE)) %>%
+  ggplot(aes(Year, mean_temp)) +
+  geom_line()
+```
+Average water temperatures are not especially closely correlated with anual 
+average air temperatures. (Based on an informal comparison with NWS data 
+from the Portland Jetport.)
+
+
+### Construct a Linear Mixed Model
+We fit a non-linear term for temperature, as we expect the relationship to
+be non-linear.  Our interest, however, focuses on the residual effects on 
+dissolved oxygen.  Note we are NOT fitting interaction terms with site here,
+even though they are likely important. The point here is just to evaluate
+whether there is a strong regional trend over time that might justify presenting
+simplified graphics in SoCB.  We conclude there is not.
+```{r}
+t_lmer <- lmer(DO~ Temp + I(Temp^2) +  Month + YearF + (1 | Site),
+               data = presumpscot_data)
+```
+
+```{r}
+summary(t_lmer)
+```
+After accounting for temperature, we still see a couple of anomalous years,
+specifically 2011, 2014, and 2016.  
+*  2016 was a year with low summer flows after a wet spring.  
+*  2014 shows no precipitation at all in summer months (At least according to 
+   Portland Jetport weather data.  This is so unlikely, that we wonder if it is 
+   a data error of some kind, although apparently not flagged as such).  It was
+   also an unusually hot summer, with Monthly mean temperatures a couple of 
+   degrees C higher than usual.
+*  2011 was a fairly normal rainfall year.
+
+But that is all data cherry picking, so should not be taken too seriously 
+without more rigorous evaluation.
+
+```{r}
+plot(emmeans(t_lmer, 'Month'))
+```
+After accounting for temperature variation, there is very little variation
+in dissolved oxygen by month, although DO corrected from temperature does appear 
+to drop at the end of the season. 
+
+```{r}
+plot(emmeans(t_lmer, 'YearF'))
+```
+
+And there is no meaningful trend over time.
+
+# Export Tabular Data for GIS
+We want to create a table of results to import into GIS.  We have interest in
+both mean dissolved oxygen levels and frequency of exceedences of DO criteria.
+
+We focus on the last five years of the record, and do not want to segregate by
+year, so we recalculate site by site frequencies and averages here.
+```{r}
+do_ins <- presumpscot_data %>%
+  filter(! is.na(DO)) %>%
+  filter(Site %in% recentsites) %>%
+  filter (Year > 2014) %>%
+  
+  group_by(Site) %>%
+  summarise(DO_Sample = sum(! is.na(DO)),
+            DO_AB = sum(DO >= 7, na.rm = TRUE),
+            DO_C = sum(DO<7 & DO>=5),
+            DO_NA = sum(DO < 5 ),
+            DO_Avg = mean(DO, na.rm = TRUE),
+            DO_SD = sd(DO, na.rm = TRUE),            
+            .groups = 'drop')
+```
+
+```{r}
+ps_ins <- presumpscot_data %>%
+  filter(! is.na(PctSat)) %>%
+  filter(Site %in% recentsites) %>%
+  filter(Year > 2014) %>%
+  group_by(Site) %>%
+  summarise(PS_Sample = sum(! is.na(PctSat)),
+            PS_AB = sum(PctSat>=75, na.rm=TRUE),
+            PS_C = sum(PctSat<75 & PctSat>=60, na.rm=TRUE),
+            PS_NA = sum(PctSat<60, na.rm=TRUE),
+            PS_Avg = mean(PctSat, na.rm = TRUE),
+            PS_SD = sd(PctSat, na.rm = TRUE),
+            .groups = 'drop')
+```
+
+```{r}
+do_results <- do_ins %>%
+  full_join(ps_ins, by = 'Site')
+```
+
+## Add Code To calculate Class
+To Calculate teh Observed Class, we need to look at the probability of violating
+water quality thresholds.
+
+Technically, any violation of standards for dissolved oxygen controls whether a 
+violation of water quality standards has occurred.  But on some level, with a 
+long record, we may want to be more forgiving and allow a rare problem.  In the
+following, we accept zero or one exceedences of a standard before we declare the
+site to have failed that standard.
+
+Rather than expressing our results in 'Class AB', 'Class C', 'Non Attainment' 
+terms, which are unlikely to be widely understood by the SoCB audience, we
+express results in terms of 'Excellent', 'Good', and 'Poor', water quality.
+The thresholds, however, reflect Maine water quality standards.
+
+```{r}
+do_results <- do_results %>%
+mutate(DO_Meets = if_else(DO_NA < 2,
+                          if_else(DO_C < 2,
+                                  'Excellent',
+                                  'Good'),
+                          'Poor'),
+       PS_Meets = if_else(PS_NA < 2,
+                          if_else(PS_C < 2,
+                                  'Excellent',
+                                  'Good'),
+                          'Poor'
+                           ),
+       Both_Meets =  if_else(DO_NA < 2 & PS_NA < 2,
+                          if_else(DO_C < 2 & PS_C < 2,
+                                  'Excellent',
+                                  'Good'),
+                          'Poor')) %>%
+  
+  # The following has no effect on the achieved classification in our data.
+  # We include it here for completeness.
+  mutate(All_Meets = if_else(DO_Avg < 6.5, 'Poor', Both_Meets))
+```
+
+```{r}
+write_csv(do_results, 'DO_Results.csv')
+```
+
+# Complex Site by Time Graphics
+These graphics are too complex for use in SoCB, but they are nevertheless of
+interest.
+
+## Instantaneous DO Standards (7, 5 mg/l)
+```{r}
+do_ins <- presumpscot_data %>%
+  group_by(Site, Year) %>%
+  filter(! is.na(DO)) %>%
+  filter(Site %in% recentsites) %>%
+  summarise(Sample = sum(! is.na(DO)),
+            AB = sum(DO >= 7, na.rm = TRUE),
+            C = sum(DO<7 & DO>=5),
+            `NA` = sum(DO < 5 ),
+            DO_Avg = mean(DO, na.rm = TRUE),
+            DO_SD = sd(DO, na.rm = TRUE),            
+            .groups = 'drop')
+```
+
+```{r fig.width=9.5, fig.height=7}
+plt <- do_ins %>%
+  select(-Sample, -DO_Avg, -DO_SD) %>%
+  pivot_longer(-c(Site, Year, ),
+               names_to = 'Category',
+               values_to = 'Count') %>%
+  
+  ggplot(aes(Year, Count, fill = Category)) +
+  geom_area(position = position_stack()) +   # alternative is position_fill()
+  facet_wrap(~ Site)  +
+  labs(title =("Instantaneous DO Standards"),
+       x = "Year",
+       y = " Observations Meeting Class") +
+  scale_fill_manual(values = cbep_colors2()[4:2], name = '') + 
+  
+  theme_cbep() +
+  theme(axis.text.x = element_text(angle=90)) +
+  
+  scale_x_continuous(labels=scales::number_format(accuracy = 1),
+                     breaks = c(2009, 2011, 2013, 2015, 2017, 2019))
+plt
+
+```
+So, the bottom line is, failure of low DO standards for class B are  rare, 
+and occur at only a couple of locations. For some sites, the displays are
+misleading, because they fail to connect non-adjacent years, thus omitting 
+information.
+
+## Instantaneous Saturation Standards (75%, 60%)
+```{r}
+ps_ins <- presumpscot_data %>%
+  filter(! is.na(PctSat)) %>%
+  filter(Site %in% recentsites) %>%
+  group_by(Site, Year) %>%
+  summarise(Sample = sum(! is.na(PctSat)),
+            Excellent = sum(PctSat>=75, na.rm=TRUE),
+            Good = sum(PctSat<75 & PctSat>=60, na.rm=TRUE),
+            Poor = sum(PctSat<60, na.rm=TRUE),
+            PctSat_Avg = mean(PctSat, na.rm = TRUE),
+            PctSat_SD = sd(PctSat, na.rm = TRUE),
+            .groups = 'drop')
+```
+
+```{r fig.width=9.5, fig.height=7}
+
+plt <- ps_ins %>%
+  select(-Sample, -PctSat_Avg, -PctSat_SD) %>%
+  pivot_longer(-c(Site, Year, ),
+               names_to = 'Category',
+               values_to = 'Count') %>%
+
+  ggplot(aes(Year, Count, fill=Category)) +
+  geom_area(position = position_stack()) +
+  facet_wrap(~Site)  +
+  #scale_x_continuous(breaks=c(2017, 2018, 2019)) +
+  #scale_y_continuous(breaks=c(1:6*2))
+
+  labs(title =("Instantaneous Percent Saturation Standards"),
+       x = "Year",
+       y = " Observations Meeting Class") +
+  scale_fill_manual(values = cbep_colors2()[4:2], name = '') + 
+  
+  theme_cbep() +
+  theme(axis.text.x = element_text(angle=90)) +
+  
+  scale_x_continuous(labels=scales::number_format(accuracy = 1),
+                     breaks = c(2009, 2011, 2013, 2015, 2017, 2019))
+plt
+```
+
+So, failure of the Pct Saturation standards happened only a few times also, and 
+only at a handful of sites.

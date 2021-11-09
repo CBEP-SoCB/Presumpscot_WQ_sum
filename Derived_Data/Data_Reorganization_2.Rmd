@@ -1,0 +1,330 @@
+---
+title: "Data Organization for Presumpscot WQ Monitoring Data"
+author:  "Curtis C. Bohlen, Casco Bay Estuary Partnership"
+date: "12/19/2020"
+output:
+  github_document:
+    toc: true
+    fig_width: 5
+    fig_height: 4
+---
+
+<img
+  src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
+  style="position:absolute;top:10px;right:50px;" />
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.align = 'center',
+                      fig.width = 5, fig.height = 4,
+                      collapse = TRUE, comment = "#>")
+```
+
+# Inroduction
+This Notebook documents how raw data was converted to the working data.
+Preliminary analysis reveals that 2018 and 2019 data were delivered incomplete,
+without all supplementary data.  While for the most part, that simply reduces
+analytic options, it also drops the flags indicating QA/QC duplicates.  Here I
+have added arbitrary flags to identify one of each replicate sample as as QA/QC
+sample.
+
+# Import Libraries
+```{r}
+library(readxl)
+library(tidyverse)
+
+```
+
+# Import Data
+```{r}
+sibfldnm <- 'Original_Data'
+parent <- dirname(getwd())
+sibling <- file.path(parent,sibfldnm)
+fn <- 'Historical_Data_Master_CORRECTED.xlsx'
+```
+
+
+## Load data
+We load the data selectively, eliminating data we will not or can not analyze.
+Note that the QC Code, in the corrected Excel spreadsheet contains "NA" as a
+string when there was no other indication of contents of the QC flag, but only 
+up through 2017.  For 2018 and 2019, this columna is empty.
+```{r}
+suppressWarnings(Prelim_presumpscot_data2 <- read_excel(file.path(sibling, fn),
+                                      col_types = c("skip", "skip",
+                                                    "text", "text",
+                                                    "skip", "numeric",  #Year
+                                                    "date","date",
+                                                    "text", "numeric",
+                                                    "skip", "text",
+                                                    "numeric", "numeric",
+                                                    "numeric", "numeric", #spcond
+                                                    "skip", "skip",
+                                                    "skip", "skip",
+                                                    "skip", "text",       #Ecoli
+                                                    "skip", "skip", 
+                                                    "skip", "skip",
+                                                    "skip", "skip",
+                                                    "skip", "skip",   
+                                                    "skip", "text",   #Sampled by
+                                                    "text", "text",
+                                                    "numeric", "text",
+                                                    "text", "skip",
+                                                    "text", "text",
+                                                    "skip", "skip",
+                                                    "text", "text")))
+```
+
+
+```{r}
+names(Prelim_presumpscot_data2)
+```
+
+
+# Clean the Data
+We rename variables and convert many to factors (without checking levels).
+```{r}
+Prelim_presumpscot_data2 <- Prelim_presumpscot_data2 %>%
+  rename(Site = `Organization Site Code`,
+         Name = `VRMP Site ID`,
+         Year = Year,
+         Date = Date,
+         Time = Time,
+         QC = `QC Type`,
+         Depth = `Sample Depth`,
+         Flow = Flow,
+         Temp = `Water Temperature (DEG C)`,
+         DO = DissolvedOxygen,
+         PctSat = `Dissolved Oxygen Saturation (%)`,
+         SpCond = `Specific Conductance (US/CM)`,
+         Ecoli = Ecoli,
+         Sampled_By = `Sampled By`,
+         Weather = `Current Weather`,
+         Recent_Weather = `Past 24HR Weather`,
+         AirTemp = `Air Temperature (DEG C)`,
+         Condition = `Air Condition`,
+         Location = `Sample Location`,
+         Stage = Stage,
+         Habitat = Habitat,
+         Appearance = `Water Appearance`,
+         Comments = Comments
+  )
+
+
+Prelim_presumpscot_data2 <- Prelim_presumpscot_data2 %>%
+  mutate_at(c('Site', 'Flow', 'Sampled_By', 'Weather', 'Recent_Weather',
+             'Condition', 'Location', 'Stage', 'Habitat', 'Appearance'), ~ factor(.)) %>%
+  mutate(Year = as.numeric(format(Date, '%Y')))
+
+summary(Prelim_presumpscot_data2)
+```
+Note that many of the descriptive data fields are incomplete, with many NAs.
+While not evident from the summaries, most were not reported for the 2018 and
+2019 data.  (Presumably that is because these data were hand entered into the
+spreadsheet by PRLT, not accessed from the complete records in DEP's EGAD data
+management system.)  Because those data are incomplete, we functionally can not
+analyze them, so we will remove them from further consideration.
+
+# Prepare Data 
+We remove qualitative data we can not analyze, and split the *E. coli* data into
+data censoring flags and numerical values.
+```{r}
+presumpscot_data <- Prelim_presumpscot_data2 %>%
+  select(-Flow, -SpCond, -Sampled_By, -Weather, -Recent_Weather, -AirTemp,
+         -Condition, -Location, - Stage, -Habitat, -Appearance, -Comments) %>%
+  mutate(qualifier = if_else(substr(Ecoli,1,1) %in% c('<', '>'),
+                            substr(Ecoli,1,1), "" ))  %>%
+  mutate(Ecoli = if_else(Ecoli=='>', '>2419.6', Ecoli)) %>%
+  mutate(value = if_else(nchar(qualifier)>0,
+                       as.numeric(substr(Ecoli,2,nchar(Ecoli))),
+                       as.numeric(Ecoli))) %>%
+  arrange(Date, Site)
+```
+
+The warning appears to be generated inside the `if_else()` call, if the value 
+of Ecoli is just a single digit.  Those values are coerced to NA by the `TRUE` 
+branch of the `if_else()` call, but then not used, as none of those are either
+left or right censored.
+
+# Check the *E. coli* data
+1. Did we generate any new NAs?
+2. Did left censored values get converted appropriately?
+3. Did right censored vlaues get converted appropriately?
+4. What do high uncensored values look like?
+```{r}
+presumpscot_data %>% select(Ecoli, qualifier, value) %>% filter( is.na(value) & ! is.na(Ecoli))
+presumpscot_data %>% select(Ecoli, qualifier, value) %>% filter( qualifier == '<')
+presumpscot_data %>% select(Ecoli, qualifier, value) %>% filter( qualifier == '>')
+presumpscot_data %>% select(Ecoli, qualifier, value) %>% filter( qualifier == '' & value >2410)
+```
+So, we've addressed all the right censored observations (no new NAs) and there
+is formally only a single left censored observation!  That's pretty remarkable.
+And it means we can ignore it for any practical purpose. In effect, we can treat
+these data as only right censored, not left censored.
+
+Note that some right censored values appear to have been inconsistently coded as
+2419.2 instead of 2419.6.  I suspect those are errors in coding, but the error
+is so small that they won't matter in any analysis, so we leave them unchanged.
+
+Similarly, there are (uncensored) values recorded at 2419.17, 2419.2, and
+2419.6. Again, my guess is these all represent maximum observable values, coded
+differently.  But differences won't matter, so we leave them unaltered.
+
+# Data Completeness
+We note that some data fields are absent for recent years.  We believe that's
+because the data file was partially downloaded from DEP, and partially entered
+directly by PRLT.
+```{r}
+presumpscot_data %>%
+  group_by(Year) %>%
+  mutate(QC = if_else(QC == "NA", NA_character_, QC)) %>%  # replace "NA"s
+  summarize_at(c("Time", "QC", "Depth", "Temp", "DO", "PctSat", "Ecoli"), 
+               function(x) sum(! is.na(x)))
+```
+The biggest issue here is the QC flag, which marks field duplicate samples.  
+That was not reported in 2019.  And it appears the QC flag was used 
+inconsistently at other times. 
+
+Lets see if there are any field duplicates in those years.
+
+# Exploring Field Duplicates
+Check for field duplicates in *E. coli* and DO data.
+```{r}
+tmp <- presumpscot_data %>%
+  mutate(QC = replace_na(QC, "NA")) %>%  # replace NAs so they can be counted
+  group_by(Date, Site) %>%
+  summarize(nColi= sum(!is.na(Ecoli) ),
+            nDO = sum(!is.na(DO)),
+            is_D = any(QC == 'D'),
+            Year = min(Year),
+            .groups = 'drop') %>%
+  filter(nColi>1 | nDO>1) %>%
+  arrange(Year, Date)
+tmp
+```
+That shows many field duplicates in 2017 (including 22 for *E coli*), none in 2018, 
+but eight (all for Dissolved oxygen) in 2019.
+
+## Identify Unflagged Duplicates
+```{r}
+tmp  %>%
+  filter(nColi > 1) %>%
+  filter(! is_D)
+```
+There appears to be one duplicate sample in 2012 that was not coded as a 
+duplicate, and duplicates are inconsistently coded in 2017.  Duplicates are 
+absent in 2018, and never coded in 2019.
+
+```{r}
+tmp  %>%
+  filter(nDO > 1) %>%
+  filter(! is_D)
+```
+Many of these are not a problem, as they were collected at different depths,
+especially in 2010, 2011, and 2012.  However, we have corrections to make
+in 2017 and 2019.
+
+## Flag 2012 Unflagged Duplicate
+The 2012 mis-coded sample is for Site = BL010, Date = 2012-08-25.  The two
+samples from that year certainly look like field duplicates.  All parameters are
+similar.  This can be corrected by recoding the one with Temp ==  17.2 as a
+Duplicate.
+
+```{r}
+index2012 <- with(presumpscot_data, (Date == as.Date("2012-08-25") &
+                       Site == "BL010" &
+                       Temp == 17.2) )
+presumpscot_data[index2012,]
+```
+
+## Deal with 2017 and 2019.
+It's a little more complicated for 2017 and 2019.  Our goal is to randomly flag
+half of the observations as duplicates, in case we chose to drop replicates for
+some reason. We note that in these data, QA/QC duplicates are always present as
+sequential pairs (because of how we sorted the data). We arbitrarily decide that 
+the one occupying an even-numbered row is the QA/QC replicate, while the other 
+is the "original" observation.
+
+### Generate a Vector Flagging Even Numbers
+```{r}
+len = length(presumpscot_data$Ecoli)
+evens <- rep(c(FALSE, TRUE),len%/% 2)
+if (length(evens) < len) append(evens, TRUE)
+```
+
+### Calculate a Selection of Duplicates
+```{r}
+selection <- presumpscot_data %>%
+  mutate(QC = replace_na(QC, "NA")) %>%  # replace NAs so they can be counted
+  group_by(Site, Date) %>%
+  mutate(nColi= sum(!is.na(Ecoli)),
+         nDO = sum(!is.na(DO)),
+         D = any(QC == "D")) %>%
+  ungroup(Site, Date) %>%
+  mutate(test = (nColi > 1 | nDO > 1) & Year==2017 & !D)
+```
+
+```{r}
+selection <- selection %>%
+  pull(test)
+```
+
+### Combine Selection Vectors
+Demonstrate that the method works. 
+```{r}
+index2017 <- selection & ! evens
+sum(index2017)
+```
+Here are the rows it selects. These are one half of each pair of
+duplicates in 2017, selected to get the value `QC <- 'D'`.
+```{r}
+presumpscot_data[index2017,] %>%
+  select(Site, Year, Date, QC, Temp, DO, PctSat) %>%
+  arrange(Site, Date)
+```
+
+It works for 2019 too. Here it flags all the 2019 DO duplicates, and selects one
+of each pair to be labeled wit the 'D'.
+```{r}
+selection <- presumpscot_data %>%
+  mutate(QC = replace_na(QC, "NA")) %>%  # replace NAs so they can be counted
+  group_by(Site, Date) %>%
+  mutate(nColi= sum(! is.na(Ecoli)),
+         nDO = sum(! is.na(DO)),
+         D = any(QC == "D")) %>%
+  ungroup(Site, Date) %>%
+  mutate(test = (nColi > 1 | nDO > 1) & Year==2019) %>% # & !D) %>%
+  pull(test)
+
+sum(selection)
+
+index2019 <- selection & evens
+sum(index2019)
+
+presumpscot_data[index2019,] %>%
+  select(Site, Year, Date, QC, Temp, DO, PctSat) %>%
+  arrange(Site, Date)
+```
+
+# Correcting the QC Flags
+We finally alter the data set to flag the field duplicates we have identified.
+```{r}
+presumpscot_data2 <- presumpscot_data%>%
+  mutate(QC = ifelse(index2012 | index2017 | index2019,
+                     "D", as.character(QC))) %>%
+  mutate(QC=factor(QC))
+```
+
+# Final Cleanup
+```{r}
+presumpscot_data2 <- presumpscot_data2 %>%
+  mutate(Flag= (qualifier == '>')) %>%
+  select(-Ecoli, -qualifier) %>%
+  rename(Ecoli = value)
+```
+
+#  Save Data as CSV
+```{r}
+tmp <- presumpscot_data2 %>%
+  mutate(Time=strftime(Time, format = "%H:%M:%S", tz="GMT"))
+write.csv(tmp, 'presumpscot_CORRECTED.csv')
+```
