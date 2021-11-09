@@ -1,48 +1,69 @@
-# Data Source
-Data received as a Google Sheets document.  E-mail from Toby Jacobs from
-Presumpscot Regional Land Trust sent to Curtis C. Bohlen March 13, 2020.
-Original data, `Historical Data Master (1).xlsx`, contained several minor
-errors.  Revised data forwarded in a follow-up e-mail on March 20, 2020 and
-downloaded by Curtis Bohlen as an Excel file March 25, 2020. `Historical Data
-Master.xlsx`
+# Data Preparation
 
-Preliminary analysis revealed observations with likely errors.  In particular,
-observations in which recorded DO and Pct Saturation values were not consistent.
-See Data QA/QC R Notebook for details.  I shared my observations with Toby
-Jacobs, who passed them on to "Kristen" at DEP, who provided corrections for
-eight samples from 2018, via another excel file, `2018Corrections.xlsx`.
+## Sample Preparation
+After data QA/QC, we reformatted the underlying Excel to CSV files using an R 
+script.
 
-Preliminary analysis also demonstrated that pairs of observations taken in 2019
-had identical *E. coli* data, but different DO values.  After consulting with
-Toby Jacobs, we interpreted these as transcription errors, in which the *E.
-coli* data were incorrectly duplicated.  While editing the file, we removed
-*E. coli* data from one of
-each pair of replicate DO samples.  We arbitrarily removed the data from the
-FIRST matching observation in the data set.
+In reorganizing the data, we also addressed some QA/QC concerns, especially from
+2017, 2018, and 2019.  In particular, some of the qualitative data fields were
+incomplete, so we had to drop variables.  In addition, duplicate samples were
+not always consistently flagged, resulting in erroneously duplicated  *E.coli*
+data, and data where it was not always clear whether they represented the same
+sampling event or not. We arbitrarily assigned one of some pairs of data from
+the same sampling date, time and location as "duplicates".  Data flags
+indicating right censoring of the *E. coli* data were not always shown with 
+consistent symbolism. We harmonized those differences, and generated a 
+separate indicator that shows censored vaues.
 
-All corrections were entered BY HAND into a copy of the data by Curtis Bohlen
-on 4/10/2020.  
-*  Samples with all data deleted are highlighted in Yellow.
-*  Samples with corrected values are highlighted in Orange, with corrected values
-   (including some dates -- differing from the original data by one day) in red
-   text.  
-*  2019 samples with *E. coli* values deleted are highlighted in Green. File
-   was saved as `Historical Data Master CORRECTED.xlsx`.
+We also dropped unused data, recoded attribute names, and otherwise looked
+for ways to simplify the data.
 
-# Geospatial Information
-Mapping data on the locations of sample sites was assembled directly from the
-Google Sheets document.  That was done by making a copy of the "Historical Data
-Master", converting all formulae on the "Mapping" tab to values, and deleting
-other tabs.  That file was saved as an excel file, `Presumpscot WQ Locations
-Data.xlsx`
+## Data Contents
+**presumpscot_CORRECTED.csv**
+Missing data is coded in this data file with "NA".
 
-# Data Notes
-The file still has some quirks.  Perhaps because it was downloaded from Google
-Sheets, Excel reports an error when loading the file, but all data appears to be
-intact on the primary data sheet.  Other sheets, with lookup tables and pivot
-table, did not transfer correctly.
+Column Name | Contents                                  | Units / Values 
+------------|-------------------------------------------|-------------- 
+(Blank)     | Row Number                                | Integer 
+Site        | Site Code                                 | Text 
+Name        | Site Name                                 | Text 
+Year        | Year of data collection                   | 2009 - 2019 
+Date        | Date of sample collection                 | "%m/%d/%Y" 
+Time        | Time of sample collection                 | "%H:%M:%S" 
+QC          | QC flags, especially "D" for duplicates   | "NA"" or "D"         
+Depth       | Depth of sample (rare)                    | meters
+Temp        | Temperature                               | Celsius
+DO          | Dissolved oxygen                          | mg/l
+PctSat      | Percent saturation (of oxygen)            | percent
+Ecoli       | E. Coli, MPN estimated colonies per 100ml | Float
+Flag        | Flags indicating  right censoring of *E. coli* data |  TRUE/FALSE
+------------|-------------------------------------------|-------------- 
 
-Historical data also has some quirks with how right censored data was recorded.
-In particular, some early observations are recorded as ">", while in years data
-they were reported as ">2419.6".  These observations are treated as equivalent.
-This interpretation was confirmed in an e-mail From Toby to Curtis on 3.23.2020.
+## Geospatial Data Contents
+Geospatial data was assembled from latitudes and longitudes in Excel files.
+The Shapefile includes the following attributes:
+
+File attributes:
+
+Column Name | Contents                                  | Units / Values 
+------------|-------------------------------------------|-------------- 
+Site_Name   | Site code (NOT a user-readable name)      | Text
+lat         | Latitide                                  | WGS 1984
+long        | Longitude                                 | WGS 1984
+Water_Body	| Name of river or stream
+Class       | Statutory class of river of stream        | "AA", "A", "B", "C"	
+Location    | narrative description of sampling location| Text
+Water_Recr  | Narrative of known recreational use of nearby waters | Text
+------------|-------------------------------------------|-------------- 
+
+## Derived Data
+### Data on *E. coli* levels 
+From `Analysis` Folder, "E_coli_Results.csv".  Our preferred summary of water
+quality conditions is the "Clss" data column.
+
+### Data on Dissolved Oxygen
+From `Analysis` Folder, "DO_Results.csv".   Our preferred summary of water
+quality conditions are the "All_Meets" or "Both_Meets" data columns (which here 
+contain the same values).
+
+
