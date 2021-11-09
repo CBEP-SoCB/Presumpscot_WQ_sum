@@ -1,40 +1,44 @@
 Analysis of Bacteria Data from Presumpscot Monitoring
 ================
 Curtis C. Bohlen, Casco Bay Estuary Partnership
-12/30/2020
+11/09/2021
 
-  - [Introduction](#introduction)
-      - [Maine’s Numeric Water Quality
+-   [Introduction](#introduction)
+    -   [Maine’s Numeric Water Quality
         Standards](#maines-numeric-water-quality-standards)
-  - [Import Libraries](#import-libraries)
-  - [Import Data](#import-data)
-      - [Folders](#folders)
-      - [Data](#data)
-  - [Lists of Sites for Specific
+-   [Import Libraries](#import-libraries)
+-   [Import Data](#import-data)
+    -   [Folders](#folders)
+    -   [Data](#data)
+-   [Lists of Sites for Specific
     Analyses](#lists-of-sites-for-specific-analyses)
-      - [Sites for Trend Analysis](#sites-for-trend-analysis)
-      - [Recent Sites](#recent-sites)
-  - [*E. coli* Histograms](#e.-coli-histograms)
-  - [What Distribution Fits?](#what-distribution-fits)
-  - [Compare Possible Distributions](#compare-possible-distributions)
-      - [Direct Fits Using VGLM](#direct-fits-using-vglm)
-          - [Comparing Two Different Lognormal
+    -   [Sites for Trend Analysis](#sites-for-trend-analysis)
+    -   [Recent Sites](#recent-sites)
+-   [*E. coli* Histograms](#e-coli-histograms)
+-   [What Distribution Fits?](#what-distribution-fits)
+-   [Compare Possible Distributions](#compare-possible-distributions)
+    -   [Direct Fits Using VGLM](#direct-fits-using-vglm)
+        -   [Comparing Two Different Lognormal
             Fits](#comparing-two-different-lognormal-fits)
-          - [Prepare Gamma Fit for
+        -   [Prepare Gamma Fit for
             Graphing](#prepare-gamma-fit-for-graphing)
-      - [Plot Candidate Distributions](#plot-candidate-distributions)
-      - [QQPlots](#qqplots)
-      - [Compare Log Likelihoods](#compare-log-likelihoods)
-  - [Linear Models Based on Recent
+    -   [Plot Candidate Distributions](#plot-candidate-distributions)
+    -   [QQPlots](#qqplots)
+    -   [Compare Log Likelihoods](#compare-log-likelihoods)
+    -   [Test Run: Linear Models on Log Transformed
+        Data](#test-run-linear-models-on-log-transformed-data)
+-   [Linear Models Based on Recent
     Data](#linear-models-based-on-recent-data)
-      - [Examine The Mixed Model](#examine-the-mixed-model)
-  - [Violations of Instantaneous *E. coli*
-    Standards](#violations-of-instantaneous-e.-coli-standards)
-      - [Binomial Model](#binomial-model)
-      - [Graphic by Site and Year](#graphic-by-site-and-year)
-  - [Assemble and Export Data for
+    -   [Examine The Mixed Model](#examine-the-mixed-model)
+-   [Developing Conventions for Graphical
+    Display](#developing-conventions-for-graphical-display)
+    -   [Violations of Instantaneous *E. coli*
+        Standards](#violations-of-instantaneous-e-coli-standards)
+    -   [Binomial Model](#binomial-model)
+    -   [Graphic by Site and Year](#graphic-by-site-and-year)
+-   [Assemble and Export Data for
     GIS](#assemble-and-export-data-for-gis)
-  - [Plot Geometric Means by Site](#plot-geometric-means-by-site)
+-   [Plot Geometric Means by Site](#plot-geometric-means-by-site)
 
 <img
   src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
@@ -60,11 +64,11 @@ river.
 Maine’s numerical water quality standards for the summer months, as laid
 out in statute (38 MRSA 465) are as follows:
 
-| Class | DO ppm “Instantaneous” | DO ppm 30 Day Avg | Percent Saturation | *E. coli* (\# per 100 ml) Instantaneous | *E. coli* (\# per 100 ml)Geom. Mean |
-| ----- | ---------------------- | ----------------- | ------------------ | --------------------------------------- | ----------------------------------- |
-| A     | 7                      |                   | 75 %               |                                         |                                     |
-| B     | 7                      |                   | 75 %               | 236                                     | 64                                  |
-| C     | 5                      | 6.5               | 60 %               | 236                                     | 126                                 |
+\|Class\|DO ppm “Instantaneous”\|DO ppm 30 Day Avg\|Percent
+Saturation\|*E. coli* (\# per 100 ml) Instantaneous\|*E. coli* (\# per
+100 ml)Geom. Mean\| ——\|——-\|——-\|——-\|——-\|——-\| \| A \| 7 \| \| 75 %
+\| \| \| \| B \| 7 \| \| 75 % \| 236 \| 64 \| \| C \| 5 \| 6.5 \| 60 %
+\| 236 \| 126 \|
 
 (Class “AA” streams are not shown in this table because there are no
 numerical standards unique to AA streams.) Bacteria standards apply over
@@ -75,24 +79,32 @@ than 10% of the time over a 90 day period.
 
 ``` r
 library(fitdistrplus)
+#> Warning: package 'fitdistrplus' was built under R version 4.0.5
 #> Loading required package: MASS
 #> Loading required package: survival
 library(VGAM)       # This is a huge package, here, offering many distributions
 #> Loading required package: stats4
 #> Loading required package: splines
 library(tidyverse)
-#> -- Attaching packages --------------------------------------- tidyverse 1.3.0 --
-#> v ggplot2 3.3.2     v purrr   0.3.4
-#> v tibble  3.0.4     v dplyr   1.0.2
-#> v tidyr   1.1.2     v stringr 1.4.0
-#> v readr   1.4.0     v forcats 0.5.0
+#> Warning: package 'tidyverse' was built under R version 4.0.5
+#> -- Attaching packages --------------------------------------- tidyverse 1.3.1 --
+#> v ggplot2 3.3.5     v purrr   0.3.4
+#> v tibble  3.1.4     v dplyr   1.0.7
+#> v tidyr   1.1.3     v stringr 1.4.0
+#> v readr   2.0.1     v forcats 0.5.1
+#> Warning: package 'ggplot2' was built under R version 4.0.5
+#> Warning: package 'tibble' was built under R version 4.0.5
+#> Warning: package 'tidyr' was built under R version 4.0.5
+#> Warning: package 'readr' was built under R version 4.0.5
+#> Warning: package 'dplyr' was built under R version 4.0.5
+#> Warning: package 'forcats' was built under R version 4.0.5
 #> -- Conflicts ------------------------------------------ tidyverse_conflicts() --
 #> x tidyr::fill()   masks VGAM::fill()
 #> x dplyr::filter() masks stats::filter()
 #> x dplyr::lag()    masks stats::lag()
 #> x dplyr::select() masks MASS::select()
-
 library(lme4)
+#> Warning: package 'lme4' was built under R version 4.0.5
 #> Loading required package: Matrix
 #> 
 #> Attaching package: 'Matrix'
@@ -100,7 +112,7 @@ library(lme4)
 #> 
 #>     expand, pack, unpack
 library(emmeans)
-
+#> Warning: package 'emmeans' was built under R version 4.0.5
 library(CBEPgraphics)
 load_cbep_fonts()
 theme_set(theme_cbep())
@@ -114,7 +126,7 @@ Note this code focuses on the *E. coli* data, and drops dissolved oxygen
 data.
 
 ``` r
-sibfldnm <- 'Derived_Data'
+sibfldnm <- 'Data'
 parent <- dirname(getwd())
 sibling <- paste(parent,sibfldnm, sep = '/')
 
@@ -126,12 +138,12 @@ dir.create(file.path(getwd(), 'figures'), showWarnings = FALSE)
 ``` r
 fn <- 'presumpscot_CORRECTED.csv'
 
-
 presumpscot_data <- read_csv(file.path(sibling, fn),
     col_types = cols(Ecoli = col_double(),
                      X1 = col_skip()))
-#> Warning: Missing column names filled in: 'X1' [1]
-
+#> New names:
+#> * `` -> ...1
+#> Warning: The following named parsers don't match the column names: X1
 presumpscot_data <- presumpscot_data %>%
   select (-Time, -DO, -PctSat) %>%
   filter( ! is.na(Ecoli)) %>%
@@ -156,8 +168,8 @@ for replicate samples, expressed as a percent difference. On a log
 scale, however, the differences are less apparent.
 
 Prior analysis has shown that \* E. coli\* samples were not replicated
-at multiple depths. Only dissolved oxygen data was collected at at
-depth, so we need only look at surface samples here.
+at multiple depths. Only dissolved oxygen data was collected at depth,
+so we need only look at surface samples here.
 
 ## Sites for Trend Analysis
 
@@ -173,7 +185,6 @@ trendsites <- presumpscot_data %>%
   summarise(yrssampled = sum(sampled)) %>%
   filter(yrssampled>=5) %>%
   pull(Site)
-#> `summarise()` ungrouping output (override with `.groups` argument)
 trendsites
 #>  [1] "BB010" "BL010" "CW010" "CW020" "DB010" "DG010" "IN010" "L010"  "L020" 
 #> [10] "M010"  "M030"  "N010"  "OB010" "P020"  "P030"  "P089"  "P110"  "P135" 
@@ -235,14 +246,15 @@ plt
 ```
 
 <img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-7-1.png" style="display: block; margin: auto;" />
+
 Notice that the values, while conceptually continuous are converted to
-select discrete values by the MPN method used . Technically this is
+select discrete values by the MPN method used. Technically this is
 interval censored data, but there are so many categories that the impact
 on analysis is probably small.
 
 The number of “uncensored” large values looks implausibly high, and a
 close look shows that several slightly different values are all included
-with NEARLY identical values. I suspect that reflects different coding
+with NEARLY identical values. That probably reflects different coding
 practices over time.
 
 ``` r
@@ -250,12 +262,16 @@ plt  + scale_x_log10()
 ```
 
 <img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-8-1.png" style="display: block; margin: auto;" />
-We have a fat tailed mound-like distribution, which suggests a lognormal
-distribution may work well for these data. But note also that we have an
-excess of elevated values. Why? Note that this level of extreme values
-suggests the geometric means are going to underestimate the real values.
+We have a fat tailed mound-like distribution when plotted ona log scale.
+That suggests a lognormal distribution may work well for these data. But
+note also that we have an excess of elevated values. Note that this
+level of extreme values suggests the geometric means are going to
+underestimate the real values.
 
 # What Distribution Fits?
+
+We use a variety of tools from `fitdistrplus` and `VGAM` to examine data
+distributions.
 
 ``` r
 presumpscot_data %>%
@@ -319,7 +335,6 @@ data should be `exp(coef(fit.LN)[2])`
 coef(fit.LN)
 #> (Intercept):1 (Intercept):2 
 #>     4.7289884     0.4601252
-
 cat('\n')
 unname(exp(coef(fit.LN)[2]))
 #> [1] 1.584272
@@ -345,7 +360,7 @@ the data.
 To simplify graphing a gamma distribution, we will use the built-in
 gamma distribution functions from Core R’s `stats` package.
 Unfortunately, they use a different parameterization from the gamma
-distribution in `VGAM`. WE need to convert them.
+distribution in `VGAM`. We need to convert them.
 
 ``` r
 coef(fit.Gamma)
@@ -397,10 +412,10 @@ lines(x,flnorm_ex, col="lightblue", lwd=2)
 ```
 
 <img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-15-1.png" style="display: block; margin: auto;" />
-The Exponential and gamma distributions are too highly skewed, and are
-clearly relatively poor fits. Both the Pareto (purple) and the lognormal
-(light blue) distributions look good. The Pareto looks perhaps slightly
-better.
+The Exponential (red) and gamma (blue) distributions are too highly
+skewed, and are clearly relatively poor fits. Both the Pareto (purple)
+and the lognormal (light blue) distributions look good. The Pareto looks
+perhaps slightly better.
 
 Note the “bump” at the upper limit, which reflects censored values.
 
@@ -435,10 +450,9 @@ qqplot(p,Fpareto_ex,
 abline(0,1)
 ```
 
-<img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-16-1.png" style="display: block; margin: auto;" />
+<img src="E.coli_Analysis_files/figure-gfm/fig.height - 7-1.png" style="display: block; margin: auto;" />
 
 ``` r
-
 par(oldpar)
 ```
 
@@ -460,11 +474,13 @@ logLik(fit.LN)
 Which actually suggests the lognormal distribution is a slightly better
 fit than Pareto.
 
-\#\#Test Run: Linear Models on Log Transformed Data We proceed with
-linear models on log-transformed response variables, which implicitly
-fit the lognormal distribution, and have the added advantage of
-providing predictions that can be readily expressed in terms of the
-geometric mean, which is how the relevant standards are written.
+## Test Run: Linear Models on Log Transformed Data
+
+We proceed with linear models on log-transformed response variables,
+which implicitly fit the lognormal distribution, and have the added
+advantage of providing predictions that can be readily expressed in
+terms of the geometric mean, which is how the relevant standards are
+written.
 
 ``` r
 oldpar <- par(mfrow = c(2,2))
@@ -472,7 +488,7 @@ thlm <- lm(log(Ecoli)~Site, data=presumpscot_data)
 plot(thlm)
 ```
 
-<img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-18-1.png" style="display: block; margin: auto;" />
+<img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-17-1.png" style="display: block; margin: auto;" />
 
 ``` r
 par(oldpar)
@@ -486,7 +502,7 @@ residuals. We check the distribution of the residuals with the
  descdist(residuals(thlm), boot=500)
 ```
 
-<img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-19-1.png" style="display: block; margin: auto;" />
+<img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-18-1.png" style="display: block; margin: auto;" />
 
     #> summary statistics
     #> ------
@@ -504,10 +520,7 @@ Residuals AFTER log transform are approximately lognormal or Gamma.
 We look at additional models.
 
 ``` r
-#thlm2   <- lm(log(Ecoli) ~ Site + Month, data = presumpscot_data)
-#thlm3   <- lm(log(Ecoli) ~ Site + Year,  data = presumpscot_data)
 thlm4   <- lm(log(Ecoli) ~ Site + Month + Year, data = presumpscot_data)
-#thlm3.5 <- lm(log(Ecoli) ~ Site + YearF,  data = presumpscot_data)
 thlm4.5 <- lm(log(Ecoli) ~ Site + Month + YearF, data = presumpscot_data)
 thlm5   <- lm(log(Ecoli) ~ Site + Month + Year + Site:Year, data = presumpscot_data)
 thlm5.5 <- lm(log(Ecoli) ~ Site + Month + YearF + Site:YearF, data = presumpscot_data)
@@ -519,7 +532,7 @@ Lets look at residuals for a fairly complex model.
 descdist(residuals(thlm4.5), boot=500)
 ```
 
-<img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-21-1.png" style="display: block; margin: auto;" />
+<img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-20-1.png" style="display: block; margin: auto;" />
 
     #> summary statistics
     #> ------
@@ -533,9 +546,9 @@ descdist(residuals(thlm4.5), boot=500)
 The distribution of residuals is essentially unchanged. It’s again
 closer to a lognormal distribution than a normal distribution. A
 lognormal model, therefor, is likely to provide misleading standard
-errors and confidence intervals. But since the*E. coli* standards are
+errors and confidence intervals. But since the *E. coli* standards are
 written in terms of geometric means, it is still convenient to continue
-with analysis of log transformed data, with appropriate cautions.
+with analysis of log transformed data, with appropriate caution.
 
 ``` r
 anova(thlm5)
@@ -592,29 +605,30 @@ AIC(thlm4, thlm4.5, thlm5, thlm5.5)
 #> thlm5.5 302 7153.405
 ```
 
-So, from a “statistical significance” perspective, both Year and Month
-terms improve model performance. A non-linear fit for the year is an
-improvement over a linear fit.
+So, from an AIC perspective, both Year and Month terms improve model
+performance. A non-linear fit for the year is an improvement over a
+linear fit.
 
 ``` r
 plot(emmeans(thlm4.5, 'YearF'))
 ```
 
-<img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-26-1.png" style="display: block; margin: auto;" />
+<img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-25-1.png" style="display: block; margin: auto;" />
 While there is year to year variation here, the patterns does not
 suggest a meaningful trend, (despite a statistically significant but
 small trend in `thlm4`).
 
 For our purposes, it is worth understanding that year to year variation
-is important, but we are not really that interested in it. We expect
-some years to have better, and some years to have worse, water quality
-based on factors like temperature, precipitation, and flow volume. Our
-interest focuses on differences among sites, and more specifically, on
-estimating geometric mean *E. coli* values.
+is important, but we are not really that interested in it unless there
+is a clear trend. We expect some years to have better, and some years to
+have worse, water quality based on factors like temperature,
+precipitation, and flow volume. Our interest focuses on differences
+among sites, and more specifically, on estimating geometric mean *E.
+coli* values.
 
-Do we can model sites directly, ignoring subtleties about sampling
+So we can model sites directly, ignoring subtleties about sampling
 history, or we can use multi-level modeling to estimate marginal means
-taking into account sampling history. lets compare results.
+taking into account sampling history. Lets compare results.
 
 # Linear Models Based on Recent Data
 
@@ -673,7 +687,7 @@ tmp <- tibble(lm_emm= lm_fit$response,
   ylab('Mixed Model')
 ```
 
-<img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-30-1.png" style="display: block; margin: auto;" />
+<img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-29-1.png" style="display: block; margin: auto;" />
 
 The predictions for the mixed models are, in general, slightly lower
 than from the simple linear model, but the two are highly correlated we
@@ -697,7 +711,7 @@ tibble(lm_width   = lm_fit$upper.CL   - lm_fit$lower.CL,
   ylab('Mixed Model CI Width')
 ```
 
-<img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-31-1.png" style="display: block; margin: auto;" />
+<img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-30-1.png" style="display: block; margin: auto;" />
 
 So, in fact, the mixed model shows slightly LARGER confidence intervals
 than a simple linear model. This is, presumably because the year to year
@@ -708,13 +722,15 @@ We thus see no advantage to using the more complex models for our
 purposes, which is to summarize results in a compact manner for figures
 or GIS.
 
+# Developing Conventions for Graphical Display
+
 Rather than expressing classification results in "Class AB’, ‘Class C’,
 ‘Non Attainment’ terms, which are unlikely to be widely understood by
 the SoCB audience, we express results in terms of ‘Excellent’, ‘Good’,
 and ‘Poor’, water categories. The thresholds, however, reflect Maine
 water quality standards.
 
-# Violations of Instantaneous *E. coli* Standards
+## Violations of Instantaneous *E. coli* Standards
 
 We make a table of the number of times samples have failed the
 instantaneous standards.
@@ -752,8 +768,8 @@ glm_emm <- emmeans(thglm, 'Site', type = 'response')
 glm_fit <- summary(glm_emm)
 ```
 
-The State instantaneous water quality criteria formally apply over a 90
-day period, and observations are allowed to exceed the instantaneous
+The instantaneous water quality criteria formally apply over a 90 day
+period, and observations are allowed to exceed the instantaneous
 standard no more than 10% of the time.
 
 ``` r
@@ -766,13 +782,13 @@ plot(glm_fit) +
   annotate('text', x = 0.05, y = 35, label = '10% Threshold', angle = 90)
 ```
 
-<img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-35-1.png" style="display: block; margin: auto;" />
+<img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-34-1.png" style="display: block; margin: auto;" />
 
 ``` r
 pwpp(glm_emm)
 ```
 
-<img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-36-1.png" style="display: block; margin: auto;" />
+<img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-35-1.png" style="display: block; margin: auto;" />
 With so many sites, it’s nearly impossible to see what is going on,
 However, On the whole, Presumpscot River Main Stem Sites (Pxxx) and most
 Pleasant River sites (Plxxx) are Lower than the most polluted sites,
@@ -781,10 +797,10 @@ with a fairly large group somewhere in the middle.
 ## Graphic by Site and Year
 
 First, we display graphics of all sites with at least five years of
-data. We do not use this graphic in SoCB, a being too complex. Also, as
-we have no evidence for long-term trends in water quality across all
-sites, we can simplify the presentation in SoCB if we focus only on
-sites for which we have recent data.
+data. We do not use this graphic in SoCB, as we judge it too complex. As
+we have no evidence for long-term trends in water quality, we can
+simplify the presentation in SoCB if we focus only on sites for which we
+have recent data.
 
 ``` r
 Ecoli_counts <- presumpscot_data %>%
@@ -815,10 +831,9 @@ p <- ggplot(Ecoli_counts, aes(x = Year, y = N_Obs, fill= WQClass)) +
 p
 ```
 
-<img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-38-1.png" style="display: block; margin: auto;" />
+<img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-37-1.png" style="display: block; margin: auto;" />
 
 ``` r
-
 ggsave('figures/ecoli_standards by year.pdf',
        device = cairo_pdf, width = 9.5, height =7)
 ```
@@ -895,16 +910,15 @@ ggplot(Ecoli_gmeans, aes(x = Site, y = gm)) +
   theme_cbep() +
   scale_fill_manual(values = cbep_colors2()[4:1]) +
   theme(axis.text.x=element_text(angle=90, vjust = .25, size = 9)) +
-  theme(legend.position = 'none') +
+  theme(legend.position = c(0.5, 0.5)) +
   
   xlab('Site') + 
   ylab('Geometric Mean E.coli\n(CFU/100ml)')
 ```
 
-<img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-41-1.png" style="display: block; margin: auto;" />
+<img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-40-1.png" style="display: block; margin: auto;" />
 
 ``` r
-
 ggsave('figures/geom_means_by_site.pdf',
        device = cairo_pdf, width = 7, height = 5)
 ```
@@ -941,10 +955,9 @@ ggplot(Ecoli_gmeans, aes(x = Site, y = Avg_Log)) +
   ylab('Mean of the Natural Log\nE.coli (CFU/100ml)')
 ```
 
-<img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-42-1.png" style="display: block; margin: auto;" />
+<img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-41-1.png" style="display: block; margin: auto;" />
 
 ``` r
-
 ggsave('figures/geom_means_by_site.pdf',
        device = cairo_pdf, width = 7, height = 5)
 ```

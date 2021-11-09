@@ -1,37 +1,37 @@
 Analysis of Dissolved Oxygen Data from Presumpscot Monitoring
 ================
 Curtis C. Bohlen, Casco Bay Estuary Partnership
-12/30/2020
+11/09/2021
 
-  - [Introduction](#introduction)
-  - [Maine’s Numeric Water Quality
+-   [Introduction](#introduction)
+-   [Maine’s Numeric Water Quality
     Standards](#maines-numeric-water-quality-standards)
-  - [Import Libraries](#import-libraries)
-  - [Import Data](#import-data)
-      - [Correct Probable Data Errors](#correct-probable-data-errors)
-      - [Create a “Surface Water Only” Ddata
+-   [Import Libraries](#import-libraries)
+-   [Import Data](#import-data)
+    -   [Correct Probable Data Errors](#correct-probable-data-errors)
+    -   [Create a “Surface Water Only” Ddata
         Set](#create-a-surface-water-only-ddata-set)
-  - [List Sites for Specific
+-   [List Sites for Specific
     Analyses](#list-sites-for-specific-analyses)
-      - [Trend Analysis](#trend-analysis)
-      - [Recent Sites](#recent-sites)
-  - [DO Graphics](#do-graphics)
-      - [Histograms](#histograms)
-      - [Percent Saturation vs. DO](#percent-saturation-vs.-do)
-  - [Linear Models](#linear-models)
-      - [Dissolved Oxygen](#dissolved-oxygen)
-      - [Percent Saturation](#percent-saturation)
-      - [Models Including Temperature](#models-including-temperature)
-          - [Graph Annual Average
+    -   [Trend Analysis](#trend-analysis)
+    -   [Recent Sites](#recent-sites)
+-   [DO Graphics](#do-graphics)
+    -   [Histograms](#histograms)
+    -   [Percent Saturation vs. DO](#percent-saturation-vs-do)
+-   [Linear Models](#linear-models)
+    -   [Dissolved Oxygen](#dissolved-oxygen)
+    -   [Percent Saturation](#percent-saturation)
+    -   [Models Including Temperature](#models-including-temperature)
+        -   [Graph Annual Average
             Temperatures](#graph-annual-average-temperatures)
-          - [Construct a Linear Mixed
+        -   [Construct a Linear Mixed
             Model](#construct-a-linear-mixed-model)
-  - [Export Tabular Data for GIS](#export-tabular-data-for-gis)
-      - [Add Code To calculate Class](#add-code-to-calculate-class)
-  - [Complex Site by Time Graphics](#complex-site-by-time-graphics)
-      - [Instantaneous DO Standards (7, 5
+-   [Export Tabular Data for GIS](#export-tabular-data-for-gis)
+    -   [Add Code To calculate Class](#add-code-to-calculate-class)
+-   [Complex Site by Time Graphics](#complex-site-by-time-graphics)
+    -   [Instantaneous DO Standards (7, 5
         mg/l)](#instantaneous-do-standards-7-5-mgl)
-      - [Instantaneous Saturation Standards (75%,
+    -   [Instantaneous Saturation Standards (75%,
         60%)](#instantaneous-saturation-standards-75-60)
 
 <img
@@ -42,15 +42,15 @@ Curtis C. Bohlen, Casco Bay Estuary Partnership
 
 This notebook provides a look at data derived from eleven years of a
 volunteer water quality monitoring managed by Presumpscot River Watch
-(PRW), and more recently, by the Presumpscot Land Trust (PRLT). The data
-were delivered to CBEP by staff at PRLT in March of 2020, incorporating
-data through 2019. PRW began submitting data to DEP in 2009, so the data
-reviewed here only goes back that far.
+(PRW), and more recently, by the Presumpscot Regional Land Trust (PRLT).
+The data were delivered to CBEP by staff at PRLT in March of 2020,
+incorporating data through 2019. PRW began submitting data to DEP in
+2009, so the data reviewed here only goes back that far.
 
-The goal of this analysis was to develop analyses to underpin graphics
-for the 2020 State of the Bay Report. However, because results at each
-monitoring site differs, results the analyses provide general
-background. Each site really needs to be evaluated on its own terms.
+The goal of this analysis was to underpin graphics for the 2020 State of
+the Bay Report. However, because results at each monitoring site
+differs, the analyses provide general background. Each site really needs
+to be evaluated on its own terms.
 
 Given the large number of sites, there is no convenient way to summarize
 results, and so simple frequencies and averages are exported to a CSV
@@ -62,7 +62,7 @@ Maine’s numerical water quality standards for the summer months, as laid
 out in statute (38 MRSA 465) are as follows:
 
 | Class | DO ppm “Instantaneous” | DO ppm 30 Day Avg | Percent Saturation | *E. coli* (\# per 100 ml) Instantaneous | *E. coli* (\# per 100 ml)Geom. Mean |
-| ----- | ---------------------- | ----------------- | ------------------ | --------------------------------------- | ----------------------------------- |
+|-------|------------------------|-------------------|--------------------|-----------------------------------------|-------------------------------------|
 | A     | 7                      |                   | 75 %               |                                         |                                     |
 | B     | 7                      |                   | 75 %               | 236                                     | 64                                  |
 | C     | 5                      | 6.5               | 60 %               | 236                                     | 126                                 |
@@ -76,27 +76,36 @@ than 10% of the time over a 90 day period.
 
 ``` r
 library(fitdistrplus)
+#> Warning: package 'fitdistrplus' was built under R version 4.0.5
 #> Loading required package: MASS
 #> Loading required package: survival
 library(emmeans)
+#> Warning: package 'emmeans' was built under R version 4.0.5
 library(tidyverse)
-#> -- Attaching packages --------------------------------------- tidyverse 1.3.0 --
-#> v ggplot2 3.3.2     v purrr   0.3.4
-#> v tibble  3.0.4     v dplyr   1.0.2
-#> v tidyr   1.1.2     v stringr 1.4.0
-#> v readr   1.4.0     v forcats 0.5.0
+#> Warning: package 'tidyverse' was built under R version 4.0.5
+#> -- Attaching packages --------------------------------------- tidyverse 1.3.1 --
+#> v ggplot2 3.3.5     v purrr   0.3.4
+#> v tibble  3.1.4     v dplyr   1.0.7
+#> v tidyr   1.1.3     v stringr 1.4.0
+#> v readr   2.0.1     v forcats 0.5.1
+#> Warning: package 'ggplot2' was built under R version 4.0.5
+#> Warning: package 'tibble' was built under R version 4.0.5
+#> Warning: package 'tidyr' was built under R version 4.0.5
+#> Warning: package 'readr' was built under R version 4.0.5
+#> Warning: package 'dplyr' was built under R version 4.0.5
+#> Warning: package 'forcats' was built under R version 4.0.5
 #> -- Conflicts ------------------------------------------ tidyverse_conflicts() --
 #> x dplyr::filter() masks stats::filter()
 #> x dplyr::lag()    masks stats::lag()
 #> x dplyr::select() masks MASS::select()
 library(lme4)
+#> Warning: package 'lme4' was built under R version 4.0.5
 #> Loading required package: Matrix
 #> 
 #> Attaching package: 'Matrix'
 #> The following objects are masked from 'package:tidyr':
 #> 
 #>     expand, pack, unpack
-
 library(CBEPgraphics)
 load_cbep_fonts()
 theme_set(theme_cbep())
@@ -105,7 +114,7 @@ theme_set(theme_cbep())
 # Import Data
 
 ``` r
-sibfldnm <- 'Derived_Data'
+sibfldnm <- 'Data'
 parent <- dirname(getwd())
 sibling <- paste(parent,sibfldnm, sep = '/')
 fn <- 'presumpscot_CORRECTED.csv'
@@ -113,8 +122,9 @@ fn <- 'presumpscot_CORRECTED.csv'
 presumpscot_data <- read_csv(file.path(sibling, fn),
     col_types = cols(Ecoli = col_double(),
                      X1 = col_skip()))
-#> Warning: Missing column names filled in: 'X1' [1]
-
+#> New names:
+#> * `` -> ...1
+#> Warning: The following named parsers don't match the column names: X1
 presumpscot_data <- presumpscot_data %>%
   select (-Time, -Ecoli, -Flag) %>%
   filter(! (is.na(DO) & is.na(PctSat))) %>%
@@ -126,8 +136,7 @@ presumpscot_data <- presumpscot_data %>%
 
 ## Correct Probable Data Errors
 
-Several values are apparent outliers in the source data. See the
-notebook `Data_QA.QC_AFTER_Corrections,Rmd` for details. These are data
+Several values are apparent outliers in the source data. These are data
 that have unlikely or unreasonable values, but for which we could not
 confirm a data handling error, so we remove them here (explicitly for
 transparency), rather than in data preparation code, where this decision
@@ -155,7 +164,7 @@ Note that this is not necessary for *E. coli*, but is for DO. Dissolved
 oxygen data was collected for several years at multiple depths at
 certain sites. While preliminary analyses suggested that depth had
 little effect on the DO levels, focusing on a “surface water only” data
-set simplifies the analysis slightly, by not requiring us to check.
+set simplifies the analysis.
 
 ``` r
 surface_data <- presumpscot_data %>%
@@ -171,7 +180,6 @@ colnames(a) <- c('N', 'DO')
 a
 #>         N   DO
 #> [1,] 2350 2238
-
 cat('Surface Data\n')
 #> Surface Data
 a <- with(surface_data, cbind(length(DO),
@@ -214,7 +222,6 @@ trendsites <- presumpscot_data %>%
   summarise(yrssampled = sum(sampled)) %>%
   filter(yrssampled>=5) %>%
   pull(Site)
-#> `summarise()` ungrouping output (override with `.groups` argument)
 trendsites
 #>  [1] "BB010" "BL010" "CW010" "CW020" "DB010" "DG010" "IN010" "L010"  "L020" 
 #> [10] "M010"  "M030"  "N010"  "OB010" "P020"  "P030"  "P089"  "P110"  "P135" 
@@ -300,7 +307,7 @@ plt
 
 <img src="DO_Analysis_files/figure-gfm/unnamed-chunk-11-1.png" style="display: block; margin: auto;" />
 Percent Saturation is even more heavily skewed. Although this is not a
-true percentage, it is effectively ratio of random variables, and so
+true percentage, it is effectively a ratio of random variables, and so
 might be expected to be distributed closer to Cauchy.
 
 ## Percent Saturation vs. DO
@@ -332,15 +339,15 @@ but a curvilinear relationship as DO levels exceed about 80%.
 
 All analyses here are a bit cavalier, as we end up concluding that we
 will not use specific results of these analyses directly in SoCB. We do
-not, for example, conduct all relevant model diagnostics, and do not
+not, for example, look at all relevant model diagnostics, and do not
 search for alternative models that may provide better estimates of
-standard errors and nominal p values. That is important because we know
-both DO and Percent Saturation figures are likely to be somewhat to
-highly skewed, with significant kurtosis. The justification is that we
-can not look at results across all monitoring sites, and probably should
-lookat each monitoring site individually, and we do not have the space
-in SoCB to do so effectively. The only summaries we use therefore are
-site by site means and frequencies.
+standard errors and nominal p values. That may be important because we
+know both DO and Percent Saturation figures are likely to be somewhat
+skewed, with significant kurtosis. The justification is that we cannot
+look at results across all monitoring sites, and probably should look at
+each monitoring site individually, but we do not have the space in SoCB
+to do so effectively. The only summaries we use therefore are site by
+site means and frequencies.
 
 ## Dissolved Oxygen
 
@@ -473,8 +480,8 @@ plot(emmeans(thlmer, 'YearF'))
 
 As for the *E. coli* data, there is no robust long term trend here.
 Although a “significant” trend can be detected statistically via a
-linear model, its slope is low, and it is a spurious value that hides
-site to site and year to year variation.
+linear model, its slope is low, and teh aalysis tends to hide site to
+site and year to year variation.
 
 ## Percent Saturation
 
@@ -526,10 +533,10 @@ anova(fin_mod_2)
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
 
-So, in both cases, the best model (by AIC) includes both year and year
-by site interaction terms, and fitting a separate value for each year
-provides a stronger fit than fitting a linear term (where the term does
-not achieve significance).
+So, in both cases, the best model (by AIC) again includes both year and
+year by site interaction terms, and fitting a separate value for each
+year provides a stronger fit than fitting a linear term (where the term
+does not achieve significance).
 
 That means we have no real pattern to point to across sites. We need to
 evaluate each site independently. There is no evidence for a meaningful
@@ -619,13 +626,12 @@ presumpscot_data %>%
   summarize(mean_temp = mean(Temp, na.rm = TRUE)) %>%
   ggplot(aes(Year, mean_temp)) +
   geom_line()
-#> `summarise()` ungrouping output (override with `.groups` argument)
 #> Warning: Removed 1 row(s) containing missing values (geom_path).
 ```
 
 <img src="DO_Analysis_files/figure-gfm/unnamed-chunk-25-1.png" style="display: block; margin: auto;" />
 Average water temperatures are not especially closely correlated with
-anual average air temperatures. (Based on an informal comparison with
+annual average air temperatures. (Based on an informal comparison with
 NWS data from the Portland Jetport.)
 
 ### Construct a Linear Mixed Model
@@ -689,9 +695,9 @@ After accounting for temperature, we still see a couple of anomalous
 years, specifically 2011, 2014, and 2016.  
 \* 2016 was a year with low summer flows after a wet spring.  
 \* 2014 shows no precipitation at all in summer months (At least
-according to Portland Jetport weather data. This is so unlikely, that we
-wonder if it is a data error of some kind, although apparently not
-flagged as such). It was also an unusually hot summer, with Monthly mean
+according to Portland Jetport weather data.) This is so unlikely, that
+we wonder if it is a data error of some kind, although apparently not
+flagged as such). It was also an unusually hot summer, with monthly mean
 temperatures a couple of degrees C higher than usual. \* 2011 was a
 fairly normal rainfall year.
 
@@ -763,7 +769,7 @@ do_results <- do_ins %>%
 
 ## Add Code To calculate Class
 
-To Calculate teh Observed Class, we need to look at the probability of
+To Calculate the Observed Class, we need to look at the probability of
 violating water quality thresholds.
 
 Technically, any violation of standards for dissolved oxygen controls
@@ -775,8 +781,8 @@ standard before we declare the site to have failed that standard.
 Rather than expressing our results in ‘Class AB’, ‘Class C’, ‘Non
 Attainment’ terms, which are unlikely to be widely understood by the
 SoCB audience, we express results in terms of ‘Excellent’, ‘Good’, and
-‘Poor’, water quality. The thresholds, however, reflect Maine water
-quality standards.
+‘Poor’, water quality. The thresholds, however, partially reflect Maine
+water quality standards.
 
 ``` r
 do_results <- do_results %>%
@@ -873,7 +879,6 @@ ps_ins <- presumpscot_data %>%
 ```
 
 ``` r
-
 plt <- ps_ins %>%
   select(-Sample, -PctSat_Avg, -PctSat_SD) %>%
   pivot_longer(-c(Site, Year, ),

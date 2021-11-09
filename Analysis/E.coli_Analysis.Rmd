@@ -1,7 +1,7 @@
 ---
 title: "Analysis of Bacteria Data from Presumpscot Monitoring"
 author:  "Curtis C. Bohlen, Casco Bay Estuary Partnership"
-date: "12/30/2020"
+date: "11/09/2021"
 output:
   github_document:
     toc: true
@@ -20,21 +20,33 @@ knitr::opts_chunk$set(fig.align = 'center',
 ```
 
 # Introduction
-This notebook provides a  look at data derived from eleven years of a volunteer water quality monitoring managed by Presumpscot River Watch (PRW), and more recently, by the Presumpscot Land Trust (PRLT). The data were delivered to CBEP by staff at PRLT in March of 2020, incorporating data through 2019.  PRW began submitting data to DEP in 2009, so the data reviewed here only goes back that far.
+This notebook provides a  look at data derived from eleven years of a volunteer
+water quality monitoring managed by Presumpscot River Watch (PRW), and more
+recently, by the Presumpscot Land Trust (PRLT). The data were delivered to CBEP
+by staff at PRLT in March of 2020, incorporating data through 2019.  PRW began
+submitting data to DEP in 2009, so the data reviewed here only goes back that
+far.
 
-The goal of this  analysis was to create graphics for the 2020 State of the Bay Report. A secondary purpose is to compare observed conditions  to Maine's water quality standards, and look for any temporal patterns that could  inform consideration of reclassification of lower stretches of the river.
+The goal of this  analysis was to create graphics for the 2020 State of the Bay
+Report. A secondary purpose is to compare observed conditions  to Maine's water
+quality standards, and look for any temporal patterns that could  inform
+consideration of reclassification of lower stretches of the river.
 
 ## Maine's Numeric Water Quality Standards
-Maine's numerical water quality standards for the summer months, as laid out in statute (38 MRSA 465) are as follows:
+Maine's numerical water quality standards for the summer months, as laid out in
+statute (38 MRSA 465) are as follows:
 
-|Class|DO ppm "Instantaneous"|DO ppm 30 Day Avg|Percent Saturation|*E. coli* (# per 100 ml) Instantaneous|*E. coli* (# per 100 ml)Geom. Mean|
+|Class|DO ppm "Instantaneous"|DO ppm 30 Day Avg|Percent Saturation|*E. coli* 
+(# per 100 ml) Instantaneous|*E. coli* (# per 100 ml)Geom. Mean|
 ------|-------|-------|-------|-------|-------|
 | A | 7 | | 75 % | | |
 | B | 7 | | 75 % | 236 | 64 |
 | C | 5 | 6.5 | 60 % | 236 | 126 |
 
-(Class "AA" streams are not shown in this table because there are no numerical standards unique to AA streams.)
-Bacteria standards apply over a 90 day period, with the instantaneous standard not to be exceeded more than 10% of the time over a 90 day period.
+(Class "AA" streams are not shown in this table because there are no numerical 
+standards unique to AA streams.) Bacteria standards apply over a 90 day period, 
+with the instantaneous standard not to be exceeded more than 10% of the time 
+over a 90 day period.
 
 # Import Libraries
 ```{r}
@@ -55,7 +67,7 @@ theme_set(theme_cbep())
 ## Folders
 Note this code focuses on the *E. coli* data, and drops dissolved oxygen data.
 ```{r}
-sibfldnm <- 'Derived_Data'
+sibfldnm <- 'Data'
 parent <- dirname(getwd())
 sibling <- paste(parent,sibfldnm, sep = '/')
 
@@ -65,7 +77,6 @@ dir.create(file.path(getwd(), 'figures'), showWarnings = FALSE)
 ## Data
 ```{r}
 fn <- 'presumpscot_CORRECTED.csv'
-
 
 presumpscot_data <- read_csv(file.path(sibling, fn),
     col_types = cols(Ecoli = col_double(),
@@ -93,7 +104,7 @@ replicate samples, expressed as a percent difference.  On a log scale, however,
 the differences are less apparent.
 
 Prior analysis has shown that * E. coli* samples were not replicated at multiple 
-depths.  Only dissolved oxygen data was collected at at depth, so we need only
+depths.  Only dissolved oxygen data was collected at depth, so we need only
 look at surface samples here.
 
 ## Sites for Trend Analysis
@@ -144,24 +155,27 @@ plt <- ggplot(presumpscot_data, aes(Ecoli)) +
   #geom_density()
 plt
 ```
+
 Notice that the values, while conceptually continuous are converted to select
-discrete values by the MPN method used .  Technically this is interval censored
+discrete values by the MPN method used.  Technically this is interval censored
 data, but there are so many categories that the impact on analysis is probably
 small.
 
 The number of "uncensored" large values looks implausibly high, and a close look
 shows that several slightly different values are all included with NEARLY
-identical values.  I suspect that reflects different coding practices over time.
+identical values.  That probably reflects different coding practices over time.
 
 ```{r}
 plt  + scale_x_log10()
 ```
-We have a fat tailed mound-like distribution, which suggests a lognormal
-distribution may work well for these data.  But note also that we have an excess
-of elevated values.  Why?  Note that this level of extreme values suggests the
-geometric means are going to underestimate the real values.
+We have a fat tailed mound-like distribution when plotted ona log scale. That
+suggests a lognormal distribution may work well for these data.  But note also
+that we have an excess of elevated values.  Note that this level of extreme
+values suggests the geometric means are going to underestimate the real values.
 
 # What Distribution Fits?
+We use a variety of tools from `fitdistrplus` and `VGAM` to examine data 
+distributions.
 ```{r}
 presumpscot_data %>%
   filter(! is.na(Ecoli)) %>%
@@ -199,7 +213,7 @@ because of different conventions regarding how to report model parameters.
 A web textbook called 
 [Loss Data Analytics: An open text authored by the Actuarial Community](https://ewfrees.github.io/Loss-Data-Analytics/) provides some helpful ideas 
 regarding analysis of heavy tailed distributions in R.  Based on information
-found there, the SD of the log data  should be `exp(coef(fit.LN)[2])`
+found there, the SD of the log data should be `exp(coef(fit.LN)[2])`
 ```{r}
 coef(fit.LN)
 
@@ -218,7 +232,8 @@ the log of the scale parameter produced by analyzing the log of the data.
 ### Prepare Gamma Fit for Graphing
 To simplify graphing a gamma distribution, we will use the built-in gamma
 distribution functions from Core R's `stats` package.  Unfortunately, they
-use a different parameterization from the gamma distribution in `VGAM`.  WE need to convert them.
+use a different parameterization from the gamma distribution in `VGAM`.  We need 
+to convert them.
 ```{r}
 coef(fit.Gamma)
 ```
@@ -257,7 +272,7 @@ flnorm_ex <- dlnorm(exp(x),
                     sd = exp(coef(fit.LN)[2]))*exp(x)
 lines(x,flnorm_ex, col="lightblue", lwd=2)
 ```
-The Exponential and gamma distributions are too highly skewed, and are clearly
+The Exponential (red) and gamma (blue) distributions are too highly skewed, and are clearly
 relatively poor fits. Both the Pareto (purple) and the lognormal (light blue)
 distributions look good. The Pareto looks perhaps slightly better. 
 
@@ -265,7 +280,7 @@ Note the "bump" at the upper limit, which reflects censored values.
 
 ## QQPlots
 Of our two best candidate distributions.
-```{r fig.width = 7}
+```{r fig.height - 7, fig.width = 7}
 dat <- presumpscot_data$Ecoli[! is.na(presumpscot_data$Ecoli)]
 p <- ppoints(sum(! is.na(presumpscot_data$Ecoli)))
 
@@ -306,7 +321,7 @@ logLik(fit.LN)
 Which actually suggests the lognormal distribution is a slightly better fit than
 Pareto.
 
-##Test Run: Linear Models on Log Transformed Data
+## Test Run: Linear Models on Log Transformed Data
 We proceed with linear models on log-transformed response variables, which
 implicitly fit the lognormal distribution, and have the added advantage of
 providing predictions that can be readily expressed in terms of the geometric
@@ -331,10 +346,7 @@ log transform are approximately lognormal or Gamma.
 
 We look at additional models.
 ```{r}
-#thlm2   <- lm(log(Ecoli) ~ Site + Month, data = presumpscot_data)
-#thlm3   <- lm(log(Ecoli) ~ Site + Year,  data = presumpscot_data)
 thlm4   <- lm(log(Ecoli) ~ Site + Month + Year, data = presumpscot_data)
-#thlm3.5 <- lm(log(Ecoli) ~ Site + YearF,  data = presumpscot_data)
 thlm4.5 <- lm(log(Ecoli) ~ Site + Month + YearF, data = presumpscot_data)
 thlm5   <- lm(log(Ecoli) ~ Site + Month + Year + Site:Year, data = presumpscot_data)
 thlm5.5 <- lm(log(Ecoli) ~ Site + Month + YearF + Site:YearF, data = presumpscot_data)
@@ -346,15 +358,15 @@ descdist(residuals(thlm4.5), boot=500)
 ```
 The distribution of residuals is essentially unchanged.  It's again closer to a 
 lognormal distribution than a normal distribution. A lognormal model, therefor, 
-is likely to provide misleading standard errors and  confidence intervals.  But
-since the*E. coli* standards are written in terms of geometric means, it is
+is likely to provide misleading standard errors and confidence intervals.  But
+since the *E. coli* standards are written in terms of geometric means, it is
 still convenient to continue with analysis of log transformed data, with
-appropriate cautions.
-
+appropriate caution.
 
 ```{r}
 anova(thlm5)
 ```
+
 ```{r}
 AIC(thlm4, thlm5)
 ```
@@ -370,13 +382,13 @@ explanatory value, as it can not uncover much pattern,
 ```{r}
 anova(thlm5.5)
 ```
+
 ```{r}
 AIC(thlm4, thlm4.5, thlm5, thlm5.5)
 ```
 
-So, from a "statistical significance" perspective, both Year and Month terms 
-improve model performance.  A non-linear fit for the year is an improvement
-over a linear fit.
+So, from an AIC perspective, both Year and Month terms improve model
+performance.  A non-linear fit for the year is an improvement over a linear fit.
 
 ```{r}
 plot(emmeans(thlm4.5, 'YearF'))
@@ -386,15 +398,15 @@ meaningful trend, (despite a statistically significant but small trend in
 `thlm4`).
 
 For our purposes, it is worth understanding that year to year variation is
-important, but we are not really that interested in it.  We expect some years 
-to have better, and some years to have worse, water quality based on factors 
-like temperature, precipitation, and flow volume. Our interest focuses on
-differences among sites, and more specifically, on estimating geometric mean
-*E. coli* values.
+important, but we are not really that interested in it unless there is a clear
+trend.  We expect some years to have better, and some years to have worse, water
+quality based on factors like temperature, precipitation, and flow volume. Our
+interest focuses on differences among sites, and more specifically, on
+estimating geometric mean *E. coli* values.
 
-Do we can model sites directly, ignoring subtleties about sampling history,
+So we can model sites directly, ignoring subtleties about sampling history,
 or we can use multi-level modeling to estimate marginal means taking into
-account sampling history.  lets compare results.
+account sampling history.  Lets compare results.
 
 # Linear Models Based on Recent Data
 We fit a simple linear model, and a model treating Years as a random factor, to
@@ -480,12 +492,14 @@ variability directly.
 We thus see no advantage to using the more complex models for our purposes,
 which is to summarize results in a compact manner for figures or GIS.
 
+
+# Developing Conventions for Graphical Display
 Rather than expressing classification results in "Class AB', 'Class C', 'Non
 Attainment' terms, which are unlikely to be widely understood by the SoCB
 audience, we express results in terms of 'Excellent', 'Good', and 'Poor', water
 categories.  The thresholds, however, reflect Maine water quality standards.
 
-# Violations of Instantaneous *E. coli* Standards
+## Violations of Instantaneous *E. coli* Standards
 We make a table of the number of times samples have failed the instantaneous
 standards.
 
@@ -502,7 +516,7 @@ cntfails <- presumpscot_data %>%
 
 ## Binomial Model
 We can  conduct a binomial analyses of those data, to evaluate differences in
-probability of failing instantaneous standards.  We have little reason to be
+probability of failing instantaneous standards. We have little reason to be
 interested in whether differences among sites are statistically significant or
 not, but we forge on nevertheless, to justify presenting any results.
 
@@ -519,7 +533,7 @@ glm_emm <- emmeans(thglm, 'Site', type = 'response')
 glm_fit <- summary(glm_emm)
 ```
 
-The State instantaneous water quality criteria formally apply over a 90 day
+The instantaneous water quality criteria formally apply over a 90 day
 period, and observations are allowed to exceed the instantaneous standard no
 more than 10% of the time.
 ```{r fig.height = 6, fig.width = 4}
@@ -542,9 +556,9 @@ somewhere in the middle.
 
 ## Graphic by Site and Year
 First, we display graphics of all sites with at least five years of data.  We do
-not use this graphic in SoCB, a being too complex. Also, as we have no evidence 
-for long-term trends in water quality across all sites, we can simplify
-the presentation in SoCB if we focus only on sites for which we have recent data.
+not use this graphic in SoCB, as we judge it too complex. As we have no evidence
+for long-term trends in water quality, we can simplify the presentation in SoCB
+if we focus only on sites for which we have recent data.
 ```{r}
 Ecoli_counts <- presumpscot_data %>%
   filter(Site %in% trendsites) %>%
@@ -646,7 +660,7 @@ ggplot(Ecoli_gmeans, aes(x = Site, y = gm)) +
   theme_cbep() +
   scale_fill_manual(values = cbep_colors2()[4:1]) +
   theme(axis.text.x=element_text(angle=90, vjust = .25, size = 9)) +
-  theme(legend.position = 'none') +
+  theme(legend.position = c(0.5, 0.5)) +
   
   xlab('Site') + 
   ylab('Geometric Mean E.coli\n(CFU/100ml)')
@@ -660,7 +674,6 @@ are better than in most of the lateral tributaries, many of which fail to meet
 even Class C (geometric mean) standards.  Using a pooled estimate of variance,
 the confidence intervals of the geometric means are dominated by scale, not by
 site to site variation in variability.
-
 
 Now we plot site by site means and standard deviations of log data. This provides
 direct graphical representation of site by site variability, measured on that 
@@ -692,6 +705,7 @@ ggsave('figures/geom_means_by_site.pdf',
 What that shows is the assumptions of pooled variances for calculating error
 bars is not wildly unreasonable.  While a few sites are more variable,
 variation at all sites are within a factor of one and one half to two or so.
-There is no indication that (on the log scale) sites with higher concentrations of bacteria have higher standard deviations too.
+There is no indication that (on the log scale) sites with higher concentrations 
+of bacteria have higher standard deviations too.
 
 
