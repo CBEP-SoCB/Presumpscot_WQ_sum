@@ -480,7 +480,7 @@ plot(emmeans(thlmer, 'YearF'))
 
 As for the *E. coli* data, there is no robust long term trend here.
 Although a “significant” trend can be detected statistically via a
-linear model, its slope is low, and teh aalysis tends to hide site to
+linear model, its slope is low, and the analysis tends to hide site to
 site and year to year variation.
 
 ## Percent Saturation
@@ -775,7 +775,7 @@ violating water quality thresholds.
 Technically, any violation of standards for dissolved oxygen controls
 whether a violation of water quality standards has occurred. But on some
 level, with a long record, we may want to be more forgiving and allow a
-rare problem. In the following, we accept zero or one exceedences of a
+rare problem. In the following, we accept zero or one exceedances of a
 standard before we declare the site to have failed that standard.
 
 Rather than expressing our results in ‘Class AB’, ‘Class C’, ‘Non
