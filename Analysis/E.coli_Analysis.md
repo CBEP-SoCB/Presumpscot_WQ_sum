@@ -262,7 +262,7 @@ plt  + scale_x_log10()
 ```
 
 <img src="E.coli_Analysis_files/figure-gfm/unnamed-chunk-8-1.png" style="display: block; margin: auto;" />
-We have a fat tailed mound-like distribution when plotted ona log scale.
+We have a fat tailed mound-like distribution when plotted on a log scale.
 That suggests a lognormal distribution may work well for these data. But
 note also that we have an excess of elevated values. Note that this
 level of extreme values suggests the geometric means are going to
@@ -321,7 +321,7 @@ fit.LN.2 <- lm(log(Ecoli)~ 1, data = presumpscot_data)
 ### Comparing Two Different Lognormal Fits
 
 The `VGAM` lognormal distribution and the fit to log transformed data
-should provide the same results. at first glance, they do not, but that
+should provide the same results. At first glance, they do not, but that
 is only because of different conventions regarding how to report model
 parameters.
 
@@ -382,7 +382,7 @@ The parameterization for the core R `pgamma()`, `rgamma()`, and
 
 ## Plot Candidate Distributions
 
-here, we plot the data density, and then overlay the fitted
+Here, we plot the data density, and then overlay the fitted
 distributions.
 
 ``` r
@@ -545,7 +545,7 @@ descdist(residuals(thlm4.5), boot=500)
 
 The distribution of residuals is essentially unchanged. It’s again
 closer to a lognormal distribution than a normal distribution. A
-lognormal model, therefor, is likely to provide misleading standard
+lognormal model, therefore, is likely to provide misleading standard
 errors and confidence intervals. But since the *E. coli* standards are
 written in terms of geometric means, it is still convenient to continue
 with analysis of log transformed data, with appropriate caution.
@@ -628,7 +628,7 @@ coli* values.
 
 So we can model sites directly, ignoring subtleties about sampling
 history, or we can use multi-level modeling to estimate marginal means
-taking into account sampling history. Lets compare results.
+taking into account sampling history. Let's compare results.
 
 # Linear Models Based on Recent Data
 
@@ -694,7 +694,7 @@ than from the simple linear model, but the two are highly correlated we
 see no real advantage to one over the other here, especially as the two
 models barely diverge for the sites that meet water quality criteria.
 
-Lets check the width of the confidence intervals to see if more
+Let's check the width of the confidence intervals to see if more
 sophisticated models gained us any precision in our estimates.
 
 ``` r
