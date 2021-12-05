@@ -26,6 +26,8 @@ PS_Meets    |  Allowing one exceptional observation, instantaneous standard this
 Both_Meets  |  Allowing one exceptional observation in each category, instantaneous standard this site meets, based on both dissolved oxygen and percent saturation data.  
 All_Meets   |  Add the criterion that mean dissolved oxygen must be over 6.5 mg/l to meet the Class C or better standards (this is a slight misapplication of state standards, which apply over a thirty day period; has no effect on results in our data).  
 
+Our preferred summary of water quality conditions are the "All_Meets" or
+"Both_Meets" data columns (which here contain the same values).
 
 **E_coli_Results.csv**
 
@@ -43,5 +45,9 @@ pFail_UC      | Upper 95% confidence limit for that probability.
 Clss          | Water quality class this site meets based on the geometric mean *E. coli* values.  
 Clss_inst_10  | Water quality class this site meets based on the geometric mean *E. coli* values, modified so any site with greater than a 10% probability of failing instantaneous water quality criteria is classified as having "Poor" water quality. Many sites get downgraded by this test.  
 Clss_inst_20  | Water quality class this site meets based on the geometric mean *E. coli* values, modified so any site with greater than a 20% chance of failing instantaneous water quality criteria is classified as having "Poor" water quality. A small number of sites get downgraded by this test.  
+
+Our preferred summary of water quality conditions is the "Class" data column.
+
+
 
 

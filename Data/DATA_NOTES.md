@@ -56,14 +56,3 @@ Location    | narrative description of sampling location| Text
 Water_Recr  | Narrative of known recreational use of nearby waters | Text
 ------------|-------------------------------------------|-------------- 
 
-## Derived Data
-### Data on *E. coli* levels 
-From `Analysis` Folder, "E_coli_Results.csv".  Our preferred summary of water
-quality conditions is the "Class" data column.
-
-### Data on Dissolved Oxygen
-From `Analysis` Folder, "DO_Results.csv".   Our preferred summary of water
-quality conditions are the "All_Meets" or "Both_Meets" data columns (which here 
-contain the same values).
-
-
