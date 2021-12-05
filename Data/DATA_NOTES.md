@@ -13,7 +13,7 @@ sampling event or not. We arbitrarily assigned one of some pairs of data from
 the same sampling date, time and location as "duplicates".  Data flags
 indicating right censoring of the *E. coli* data were not always shown with 
 consistent symbolism. We harmonized those differences, and generated a 
-separate indicator that shows censored vaues.
+separate indicator that shows censored values.
 
 We also dropped unused data, recoded attribute names, and otherwise looked
 for ways to simplify the data.
@@ -48,7 +48,7 @@ File attributes:
 Column Name | Contents                                  | Units / Values 
 ------------|-------------------------------------------|-------------- 
 Site_Name   | Site code (NOT a user-readable name)      | Text
-lat         | Latitide                                  | WGS 1984
+lat         | Latitude                                  | WGS 1984
 long        | Longitude                                 | WGS 1984
 Water_Body	| Name of river or stream
 Class       | Statutory class of river of stream        | "AA", "A", "B", "C"	
@@ -59,7 +59,7 @@ Water_Recr  | Narrative of known recreational use of nearby waters | Text
 ## Derived Data
 ### Data on *E. coli* levels 
 From `Analysis` Folder, "E_coli_Results.csv".  Our preferred summary of water
-quality conditions is the "Clss" data column.
+quality conditions is the "Class" data column.
 
 ### Data on Dissolved Oxygen
 From `Analysis` Folder, "DO_Results.csv".   Our preferred summary of water
