@@ -61,11 +61,11 @@ file for import into GIS for graphic display.
 Maine’s numerical water quality standards for the summer months, as laid
 out in statute (38 MRSA 465) are as follows:
 
-| Class | DO ppm “Instantaneous” | DO ppm 30 Day Avg | Percent Saturation | *E. coli* (\# per 100 ml) Instantaneous | *E. coli* (\# per 100 ml)Geom. Mean |
-|-------|------------------------|-------------------|--------------------|-----------------------------------------|-------------------------------------|
-| A     | 7                      |                   | 75 %               |                                         |                                     |
-| B     | 7                      |                   | 75 %               | 236                                     | 64                                  |
-| C     | 5                      | 6.5               | 60 %               | 236                                     | 126                                 |
+| Class | DO ppm “Instantaneous” | DO ppm 30 Day Avg | Percent Saturation | *E. coli* (\# per 100 ml) “Instantaneous” | *E. coli* (\# per 100 ml) Geom. Mean |
+|-------|------------------------|-------------------|--------------------|-------------------------------------------|--------------------------------------|
+| A     | 7                      |                   | 75 %               |                                           |                                      |
+| B     | 7                      |                   | 75 %               | 236                                       | 64                                   |
+| C     | 5                      | 6.5               | 60 %               | 236                                       | 126                                  |
 
 (Class “AA” streams are not shown in this table because there are no
 numerical standards unique to AA streams.) Bacteria standards apply over
@@ -85,13 +85,11 @@ library(tidyverse)
 #> Warning: package 'tidyverse' was built under R version 4.0.5
 #> -- Attaching packages --------------------------------------- tidyverse 1.3.1 --
 #> v ggplot2 3.3.5     v purrr   0.3.4
-#> v tibble  3.1.4     v dplyr   1.0.7
-#> v tidyr   1.1.3     v stringr 1.4.0
-#> v readr   2.0.1     v forcats 0.5.1
+#> v tibble  3.1.6     v dplyr   1.0.7
+#> v tidyr   1.1.4     v stringr 1.4.0
+#> v readr   2.1.0     v forcats 0.5.1
 #> Warning: package 'ggplot2' was built under R version 4.0.5
-#> Warning: package 'tibble' was built under R version 4.0.5
 #> Warning: package 'tidyr' was built under R version 4.0.5
-#> Warning: package 'readr' was built under R version 4.0.5
 #> Warning: package 'dplyr' was built under R version 4.0.5
 #> Warning: package 'forcats' was built under R version 4.0.5
 #> -- Conflicts ------------------------------------------ tidyverse_conflicts() --
@@ -106,6 +104,7 @@ library(lme4)
 #> The following objects are masked from 'package:tidyr':
 #> 
 #>     expand, pack, unpack
+
 library(CBEPgraphics)
 load_cbep_fonts()
 theme_set(theme_cbep())
@@ -125,6 +124,7 @@ presumpscot_data <- read_csv(file.path(sibling, fn),
 #> New names:
 #> * `` -> ...1
 #> Warning: The following named parsers don't match the column names: X1
+
 presumpscot_data <- presumpscot_data %>%
   select (-Time, -Ecoli, -Flag) %>%
   filter(! (is.na(DO) & is.na(PctSat))) %>%
@@ -180,6 +180,7 @@ colnames(a) <- c('N', 'DO')
 a
 #>         N   DO
 #> [1,] 2350 2238
+
 cat('Surface Data\n')
 #> Surface Data
 a <- with(surface_data, cbind(length(DO),
@@ -480,7 +481,7 @@ plot(emmeans(thlmer, 'YearF'))
 
 As for the *E. coli* data, there is no robust long term trend here.
 Although a “significant” trend can be detected statistically via a
-linear model, its slope is low, and teh aalysis tends to hide site to
+linear model, its slope is low, and the analysis tends to hide site to
 site and year to year variation.
 
 ## Percent Saturation
@@ -725,7 +726,7 @@ And there is no meaningful trend over time.
 
 We want to create a table of results to import into GIS. We have
 interest in both mean dissolved oxygen levels and frequency of
-exceedences of DO criteria.
+exceedances of DO criteria.
 
 We focus on the last five years of the record, and do not want to
 segregate by year, so we recalculate site by site frequencies and

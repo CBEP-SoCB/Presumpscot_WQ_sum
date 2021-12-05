@@ -40,11 +40,11 @@ import into GIS for graphic display.
 Maine's numerical water quality standards for the summer months, as laid out in
 statute (38 MRSA 465) are as follows:
 
-|Class|DO ppm "Instantaneous"|DO ppm 30 Day Avg|Percent Saturation|*E. coli* (# per 100 ml) Instantaneous|*E. coli* (# per 100 ml)Geom. Mean|
-------|-------|-------|-------|-------|-------|
-| A | 7 | | 75 % | | |
-| B | 7 | | 75 % | 236 | 64 |
-| C | 5 | 6.5 | 60 % | 236 | 126 |
+| Class|DO ppm "Instantaneous" | DO ppm 30 Day Avg |Percent Saturation | *E. coli* (# per 100 ml) "Instantaneous" | *E. coli* (# per 100 ml) Geom. Mean |  
+------|-------|-------|-------|-------|-------|  
+| A   | 7     |       | 75 %  |       |       |  
+| B   | 7     |       | 75 %  | 236   | 64    |  
+| C   | 5     | 6.5   | 60 %  | 236   | 126   |  
 
 (Class "AA" streams are not shown in this table because there are no numerical
 standards unique to AA streams.)
@@ -288,7 +288,7 @@ plot(emmeans(thlmer, 'YearF'))
 
 As for the *E. coli* data, there is no robust long term trend here.  Although a
 "significant" trend can be detected statistically via a linear model, its slope 
-is low, and teh aalysis tends to hide site to site and year to year variation.
+is low, and the analysis tends to hide site to site and year to year variation.
 
 ## Percent Saturation
 ```{r}
@@ -395,7 +395,7 @@ And there is no meaningful trend over time.
 
 # Export Tabular Data for GIS
 We want to create a table of results to import into GIS.  We have interest in
-both mean dissolved oxygen levels and frequency of exceedences of DO criteria.
+both mean dissolved oxygen levels and frequency of exceedances of DO criteria.
 
 We focus on the last five years of the record, and do not want to segregate by
 year, so we recalculate site by site frequencies and averages here.
