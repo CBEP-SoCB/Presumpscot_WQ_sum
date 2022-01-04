@@ -1,3 +1,5 @@
+Insert Logo
+
 # Presumpscot Water Quality Data
 
 Analysis of volunteer water quality monitoring data from Presumpscot River Watch 
