@@ -410,7 +410,7 @@ for a meaningful trend across the region.
 
 To evaluate the temporal pattern, we can fit a model by year that treats
 each site as a random factor, and focuses on average conditions year by
-year across sites. We include the MOnth term in the model to reduce
+year across sites. We include the Month term in the model to reduce
 variance estimates.
 
 ``` r
